@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Security Toys — small pages that break a misconception</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2e; --panel2:#0e1626; --line:#22304d;
+    --ink:#e6edf7; --muted:#93a4c3; --accent:#fbbf24; --good:#34d399;
+    --fs:16px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:radial-gradient(1200px 800px at 30% -10%, #16223c 0%, var(--bg) 55%);
+    color:var(--ink); font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:var(--fs); min-height:100vh; padding:34px clamp(14px,4vw,28px) 50px;
+  }
+  body.present{--fs:20px;}
+  .wrap{max-width:1000px; margin:0 auto;}
+  h1{font-size:1.7em; letter-spacing:.3px;}
+  h1 span{color:var(--accent);}
+  .sub{color:var(--muted); font-size:.9em; margin-top:10px; max-width:66ch; line-height:1.6;}
+  .grid{display:grid; gap:14px; margin-top:26px;
+        grid-template-columns:repeat(auto-fill,minmax(290px,1fr));}
+  a.toy, div.toy{
+    display:block; background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:16px 18px; text-decoration:none; color:inherit;
+  }
+  a.toy:hover{border-color:#3b82f6; background:linear-gradient(180deg,#1a2a4a,#12203d);}
+  div.toy{opacity:.5;}
+  .toy h2{font-size:1.02em; letter-spacing:.2px;}
+  .toy .kills{color:var(--muted); font-size:.82em; line-height:1.5; margin-top:8px;}
+  .toy .kills b{color:var(--ink); font-weight:600;}
+  .tag{display:inline-block; margin-top:12px; padding:4px 10px; border-radius:99px;
+       font-size:.7em; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+       background:#34d39922; color:var(--good); border:1px solid #34d39955;}
+  .tag.soon{background:#93a4c322; color:var(--muted); border-color:#93a4c344;}
+  h3{font-size:.75em; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted);
+     margin:34px 0 12px;}
+  .rules{color:var(--muted); font-size:.84em; line-height:1.7; padding-left:1.1em;}
+  .rules b{color:var(--ink); font-weight:600;}
+  footer{color:var(--muted); font-size:.78em; line-height:1.7; margin-top:32px;
+         border-top:1px solid var(--line); padding-top:16px;}
+  footer a{color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Security Toys — <span>small pages that break a misconception</span></h1>
+  <p class="sub">
+    Each one is a single self-contained page built to kill one specific wrong idea that slides
+    reliably fail to kill. No install, no account, no network. Save the page and it still works.
+    Part of the <a href="https://github.com/michael-borck/security-labs" style="color:var(--accent)">Assume-Breach series</a>.
+  </p>
+
+  <div class="grid">
+
+    <a class="toy" href="crack-time/">
+      <h2>Crack Time</h2>
+      <p class="kills">Kills: <b>“complexity is what matters”</b>. Time-to-crack is length × algorithm
+        × work factor — and two of those three are the site’s decision, not yours.</p>
+      <span class="tag">Ready</span>
+    </a>
+
+    <a class="toy" href="defence-in-depth/">
+      <h2>Defence in Depth</h2>
+      <p class="kills">Kills: <b>“we bought a firewall, we’re fine”</b>. Layer the controls, misalign
+        the holes, and buy the longest attack path your budget allows.</p>
+      <span class="tag">Ready</span>
+    </a>
+
+    <div class="toy">
+      <h2>Detection Dial</h2>
+      <p class="kills">Kills: <b>base-rate neglect</b>. One threshold, 10,000 events, 3 real
+        intrusions — and no setting that gives you both a clean queue and full coverage.</p>
+      <span class="tag soon">Building</span>
+    </div>
+
+    <div class="toy">
+      <h2>Rule Order</h2>
+      <p class="kills">Kills: <b>“a ruleset is a set”</b>. It’s a sequence, first match wins, and the
+        catch-all at the bottom quietly undoes everything above it.</p>
+      <span class="tag soon">Building</span>
+    </div>
+
+    <div class="toy">
+      <h2>Query Builder</h2>
+      <p class="kills">Kills: <b>injection as magic incantation</b>. Watch the SQL assemble as you
+        type, then flip one toggle and watch the same input go inert.</p>
+      <span class="tag soon">Building</span>
+    </div>
+
+    <div class="toy">
+      <h2>EXIF Drop</h2>
+      <p class="kills">Kills: <b>“a photo is a picture”</b>. Camera, timestamp, and the coordinates
+        of wherever you were standing. Entirely in your browser.</p>
+      <span class="tag soon">Building</span>
+    </div>
+
+  </div>
+
+  <h3>House rules</h3>
+  <ul class="rules">
+    <li><b>One file.</b> No CDN, no fonts, no fetch — runs from a USB stick, uploads to an LMS as a single file.</li>
+    <li><b>One idea.</b> If it needs a tutorial, it’s too big.</li>
+    <li><b>Ninety seconds.</b> Playable from cold by someone who read no instructions.</li>
+    <li><b>A “wait, what?” moment.</b> Named in every spec. If a build doesn’t produce it, it isn’t finished.</li>
+    <li><b>Nothing leaves the page.</b> No storage, no analytics, no backend, anywhere in this collection.</li>
+  </ul>
+
+  <footer>
+    Add <code>?present</code> to any toy to bump type sizes for a projector.<br>
+    MIT licensed · unit-agnostic teaching material · <a href="https://github.com/michael-borck/security-toys">source</a>
+  </footer>
+
+</div>
+<script>
+if(new URLSearchParams(location.search).has("present")) document.body.classList.add("present");
+</script>
+</body>
+</html>

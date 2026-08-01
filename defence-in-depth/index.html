@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Defence in Depth — The Swiss-Cheese Game</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2e; --panel2:#0e1626; --line:#22304d;
+    --ink:#e6edf7; --muted:#93a4c3;
+    --physical:#2dd4bf; --admin:#60a5fa; --technical:#a78bfa;
+    --cia:#fbbf24; --attack:#f87171; --good:#34d399; --bad:#f87171;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:radial-gradient(1200px 800px at 30% -10%, #16223c 0%, var(--bg) 55%);
+    color:var(--ink); font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex; flex-direction:column; min-height:100vh;
+  }
+  header{
+    padding:18px 26px 10px; display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  }
+  header h1{font-size:22px; letter-spacing:.3px;}
+  header h1 span{color:var(--cia);}
+  header .sub{color:var(--muted); font-size:13px; margin-top:4px; max-width:640px;}
+  .tabs{display:flex; gap:8px;}
+  .tab{
+    background:var(--panel); border:1px solid var(--line); color:var(--muted);
+    padding:9px 16px; border-radius:10px; cursor:pointer; font-size:14px; font-weight:600;
+  }
+  .tab.active{color:var(--ink); border-color:#3b82f6; background:#15234109;
+    background:linear-gradient(180deg,#1a2a4a,#12203d); box-shadow:0 0 0 1px #3b82f655;}
+  #topbar{display:flex; gap:12px; padding:8px 26px 0; align-items:stretch;}
+  #narrCard{flex:1; min-width:0;}
+  main{flex:1; display:flex; gap:14px; padding:10px 26px 14px; align-items:stretch; min-height:0;}
+  .stage{
+    flex:1; min-width:0; background:var(--panel2); border:1px solid var(--line);
+    border-radius:16px; position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden;
+  }
+  .stage svg{height:clamp(420px, calc(100vh - 300px), 820px); width:auto; max-width:100%; display:block;}
+  .side{
+    width:330px; flex:none; display:flex; flex-direction:column; gap:12px;
+    overflow-y:auto; min-height:0; padding-right:2px;
+  }
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 15px;}
+  .card h3{font-size:11.5px; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted); margin-bottom:7px;}
+  #caption{font-size:14.5px; line-height:1.45; min-height:44px;}
+  #caption b{color:var(--cia);}
+  .meter-wrap{margin-top:10px;}
+  .meter-label{display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:5px;}
+  .meter{height:12px; background:#0a1020; border:1px solid var(--line); border-radius:99px; overflow:hidden;}
+  .meter>div{height:100%; width:0%; border-radius:99px;
+    background:linear-gradient(90deg,#34d399,#fbbf24,#f87171);
+    transition:width .12s linear;}
+  .legend{display:grid; grid-template-columns:auto auto auto; gap:5px 14px; font-size:12px; color:var(--muted); white-space:nowrap;}
+  .legend i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:-1px;}
+  .btnrow{display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;}
+  button.act{
+    background:linear-gradient(180deg,#1d4ed8,#1e40af); color:#fff; border:0; border-radius:10px;
+    padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer;
+  }
+  button.act:disabled{opacity:.45; cursor:default;}
+  button.ghost{
+    background:var(--panel2); color:var(--muted); border:1px solid var(--line); border-radius:10px;
+    padding:10px 14px; font-size:13.5px; cursor:pointer;
+  }
+  button.ghost:hover{color:var(--ink);}
+  .tray{display:flex; flex-direction:column; gap:4px;}
+  .tray .grp{font-size:10.5px; text-transform:uppercase; letter-spacing:1px; font-weight:800; margin:7px 0 2px;}
+  .tray .grp:first-child{margin-top:0;}
+  .chip{
+    display:flex; align-items:center; gap:7px; padding:5px 10px; border-radius:9px; font-size:12.5px; font-weight:600;
+    border:1.5px solid; cursor:grab; user-select:none; background:#0a1020; touch-action:none;
+  }
+  .chip .cost{margin-left:auto;}
+  .chip.placed{opacity:.28; cursor:default; text-decoration:line-through;}
+  .chip.cantafford{opacity:.35; cursor:not-allowed; filter:grayscale(.7);}
+  .chip .cost{opacity:.75; font-weight:800; font-size:11.5px; margin-left:2px;}
+  #budgetLine{font-size:13.5px; font-weight:700; color:var(--cia); margin-bottom:8px;}
+  #budgetLine .un{color:var(--muted); font-weight:600;}
+  #ciaReadout{font-size:12.5px; color:var(--muted); margin-top:8px;}
+  #ciaReadout b{color:var(--cia);}
+  .chip[data-layer=physical]{border-color:var(--physical); color:var(--physical);}
+  .chip[data-layer=admin]{border-color:var(--admin); color:var(--admin);}
+  .chip[data-layer=technical]{border-color:var(--technical); color:var(--technical);}
+  .chip .dot{width:8px;height:8px;border-radius:50%;}
+  #dragGhost{position:fixed; pointer-events:none; z-index:99; display:none; transform:translate(-50%,-50%); opacity:.9;}
+  .hint{font-size:12.5px; color:var(--muted); line-height:1.5; margin-top:8px;}
+  .stats{display:flex; gap:8px; text-align:center;}
+  .stats>div{background:#0a1020; border:1px solid var(--line); border-radius:10px; padding:5px 10px; min-width:66px;}
+  .stats .n{font-size:18px; font-weight:800;}
+  .stats .l{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.7px;}
+  #overlay{position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(5,9,18,.72); backdrop-filter:blur(2px); z-index:10;}
+  #overlay.show{display:flex;}
+  .ov-card{width:min(560px,90%); max-height:86%; overflow-y:auto; background:var(--panel);
+    border:1px solid var(--line); border-radius:16px; padding:20px 22px;
+    box-shadow:0 18px 60px rgba(0,0,0,.55); animation:ovin .28s ease;}
+  @keyframes ovin{from{transform:translateY(16px); opacity:0}to{transform:none; opacity:1}}
+  .ov-card .headline{font-size:20px; font-weight:800; margin-bottom:8px;}
+  .ov-card.good .headline{color:var(--good);}
+  .ov-card.bad .headline{color:var(--bad);}
+  .ov-card.good{border-color:#34d39955;}
+  .ov-card.bad{border-color:#f8717155;}
+  #outBody{font-size:14px; line-height:1.55; color:var(--muted);}
+  #outForensics{margin:10px 0 0 18px; font-size:13px; color:var(--muted); line-height:1.65;}
+  footer{padding:0 26px 16px; color:#64748b; font-size:12px;}
+  .banner{
+    position:absolute; top:14px; left:50%; transform:translateX(-50%) translateY(-70px);
+    background:#052e1f; border:1px solid #34d39977; color:#a7f3d0; padding:9px 18px; border-radius:99px;
+    font-weight:700; font-size:14px; transition:transform .35s ease; white-space:nowrap; z-index:5;
+  }
+  .banner.bad{background:#3a0d12; border-color:#f8717177; color:#fecaca;}
+  .banner.show{transform:translateX(-50%) translateY(0);}
+  @keyframes pulse{0%{r:7}50%{r:12}100%{r:7}}
+  .mode-hide{display:none !important;}
+  /* SOC feed (attack stream) */
+  #stream{position:absolute; left:12px; bottom:12px; width:320px; z-index:4; pointer-events:none;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; line-height:1.45;}
+  #stream .sl{background:rgba(6,10,20,.78); border-left:2px solid #22304d; padding:3px 8px;
+    margin-top:3px; border-radius:0 6px 6px 0; color:#7e90b3; animation:slin .3s ease;}
+  #stream .sl.blocked{border-left-color:#34d39988; color:#93b8a8;}
+  #stream .sl.alert{border-left-color:var(--bad); color:#fca5a5; font-weight:700;}
+  #stream .sl:nth-child(1){opacity:.35} #stream .sl:nth-child(2){opacity:.5}
+  #stream .sl:nth-child(3){opacity:.65} #stream .sl:nth-child(4){opacity:.8}
+  @keyframes slin{from{transform:translateX(-8px);opacity:0}}
+  /* risk matrix (CISO) */
+  #rmWrap{display:flex; gap:6px; align-items:stretch;}
+  #rmYlab{writing-mode:vertical-rl; transform:rotate(180deg); text-align:center; font-size:10px;
+    color:var(--muted); letter-spacing:1px;}
+  #rmGrid{flex:1; display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr); gap:3px;}
+  .rmc{border-radius:6px; min-height:38px; display:flex; flex-wrap:wrap; gap:2px; align-items:center;
+    justify-content:center; padding:2px; border:1px solid #ffffff10;}
+  .rmc.s0{background:#12351f66;} .rmc.s1{background:#274a2666;} .rmc.s2{background:#4a3a1466;}
+  .rmc.s3{background:#4a201466;} .rmc.s4{background:#58121566;}
+  .rmt{font-size:14px; cursor:default; transition:transform .15s;}
+  .rmt.pulse{animation:rmp .7s ease;}
+  @keyframes rmp{30%{transform:scale(1.7)}}
+  #rmXlab{text-align:center; font-size:10px; color:var(--muted); letter-spacing:1px; margin-top:3px;}
+  #lvlDesc{font-size:12px; color:var(--muted); line-height:1.45; margin-bottom:8px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Defence in Depth — <span>the Swiss-Cheese model</span></h1>
+    <div class="sub">Every layer of controls has holes. Your job isn’t to make risk zero — it can’t be —
+      it’s to make sure the holes never line up, so an attacker’s journey to the core takes long enough to be detected.</div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" id="tabWatch">▶ Watch</button>
+    <button class="tab" id="tabL1">L1 · Analyst</button>
+    <button class="tab" id="tabL2">L2 · Manager</button>
+    <button class="tab" id="tabL3">L3 · CISO</button>
+  </div>
+</header>
+
+<div id="topbar">
+  <div class="card" id="narrCard">
+    <h3 id="capTitle">Narration</h3>
+    <div id="caption">Choose a scenario to see how misaligned “cheese holes” buy defenders time — and how aligned ones cause a breach.</div>
+    <div class="meter-wrap">
+      <div class="meter-label"><span>🛰 Detection window</span><span id="delayReadout">delay: 0.0s</span></div>
+      <div class="meter"><div id="meterFill"></div></div>
+    </div>
+  </div>
+
+  <div class="card mode-hide" id="statsCard">
+    <h3>Scoreboard</h3>
+    <div class="stats">
+      <div><div class="n" id="stRounds">0</div><div class="l">Attacks</div></div>
+      <div><div class="n" id="stContained" style="color:var(--good)">0</div><div class="l">Contained</div></div>
+      <div><div class="n" id="stBreached" style="color:var(--bad)">0</div><div class="l">Breaches</div></div>
+      <div><div class="n" id="stBest">–</div><div class="l">Best delay</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Layers</h3>
+    <div class="legend">
+      <span><i style="background:var(--physical)"></i>Physical</span>
+      <span><i style="background:var(--admin)"></i>Administrative</span>
+      <span><i style="background:var(--technical)"></i>Technical</span>
+      <span><i style="background:var(--cia)"></i>CIA triad</span>
+      <span><i style="background:var(--attack)"></i>Attack path</span>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div class="stage">
+    <div class="banner" id="banner">⚠ SOC alert — anomaly detected</div>
+    <svg id="scene" viewBox="0 0 800 800" aria-label="Defence in depth diagram"></svg>
+    <div id="stream"></div>
+    <div id="overlay">
+      <div class="ov-card" id="ovCard">
+        <div class="headline" id="outHead"></div>
+        <div id="outBody"></div>
+        <ul id="outForensics"></ul>
+        <div class="btnrow" style="margin-top:16px">
+          <button class="act" id="ovAction"></button>
+          <button class="ghost" id="ovClose">🔍 Inspect the board</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="side">
+    <!-- WATCH MODE -->
+    <div class="card" id="watchPanel">
+      <h3>Scenarios</h3>
+      <div class="btnrow">
+        <button class="act" id="btnRandom" style="background:linear-gradient(180deg,#7c3aed,#5b21b6)">🎲 Random scenario</button>
+        <button class="act" id="btnDetect">🛡 Detection story</button>
+        <button class="act" id="btnBreach" style="background:linear-gradient(180deg,#b91c1c,#7f1d1d)">💥 Breach story</button>
+      </div>
+      <div class="hint">The red trace is the attacker. Radial moves punch through a gap; the circling moves are the attacker <b style="color:var(--ink)">searching</b> for the next gap — that searching is the delay defenders rely on.</div>
+    </div>
+
+    <!-- RISK MATRIX (CISO) -->
+    <div class="card mode-hide" id="riskCard">
+      <h3>Threat risk matrix</h3>
+      <div id="rmWrap">
+        <div id="rmYlab">IMPACT ▲</div>
+        <div>
+          <div id="rmGrid"></div>
+          <div id="rmXlab">LIKELIHOOD ▶</div>
+        </div>
+      </div>
+      <div class="hint" style="margin-top:6px">Placing a control that mitigates a threat drags it left (less likely). Some controls soften <i>impact</i> instead. Hover a threat for details.</div>
+    </div>
+
+    <!-- PLAY MODE -->
+    <div class="card mode-hide" id="playPanel">
+      <h3 id="lvlTitle">Your controls <span id="trayCount" style="float:right"></span></h3>
+      <div id="lvlDesc"></div>
+      <div id="budgetLine"></div>
+      <div class="btnrow" style="margin:2px 0 10px">
+        <button class="act" id="btnLaunch">🚨 Launch attack</button>
+        <button class="act" id="btnFund" style="background:linear-gradient(180deg,#b45309,#92400e)">💰 Seek funding</button>
+        <button class="ghost" id="btnShuffle">New round</button>
+      </div>
+      <div class="tray" id="tray"></div>
+      <div class="hint">Drag onto a matching-colour gap; click a plug for a refund. <b style="color:var(--ink)">More options than gaps, more gaps than budget</b> — buy the <i>longest possible path</i>: the attacker gives up when the SOC timer hits zero.</div>
+      <div id="ciaReadout"></div>
+    </div>
+
+  </div>
+</main>
+
+<footer>Conceptual model for teaching — real defence in depth also spans detection, response and recovery. Risk never reaches zero; the goal is time.</footer>
+<div id="dragGhost"></div>
+
+<script>
+"use strict";
+/* ================= geometry & constants ================= */
+const CX=400, CY=400, HOLE_W=17;            // hole angular width (deg)
+const SPEED=150;                            // attacker px/sec
+const rad=a=>a*Math.PI/180;
+const pt=(r,a)=>[CX+r*Math.cos(rad(a)), CY+r*Math.sin(rad(a))];
+const norm=a=>((a%360)+360)%360;
+const shortest=(a,b)=>{const d=((b-a+540)%360)-180; return d===-180?180:d;}; // signed (-180,180]
+
+const RINGS=[
+  {id:"physical",  label:"Physical controls",       rIn:300, rOut:352, color:"var(--physical)", raw:"#2dd4bf"},
+  {id:"admin",     label:"Administrative controls", rIn:220, rOut:272, color:"var(--admin)",    raw:"#60a5fa"},
+  {id:"technical", label:"Technical controls",      rIn:140, rOut:192, color:"var(--technical)",raw:"#a78bfa"},
+];
+const CORRIDOR=[286,206];   // radius attacker circles at, between ring 0-1 and 1-2
+const ENTRY_R=386;
+
+/* cost in $k; cia = [C,I,A] contribution 0–3 (conceptual best guess) */
+const CONTROLS=[
+  {id:"fence",  layer:"physical",  icon:"🚧", name:"Perimeter fence",     cost:70,  cia:[1,0,2]},
+  {id:"cctv",   layer:"physical",  icon:"📷", name:"CCTV",                cost:50,  cia:[1,1,0]},
+  {id:"badge",  layer:"physical",  icon:"🛂", name:"Badge access",        cost:60,  cia:[2,1,0]},
+  {id:"guards", layer:"physical",  icon:"💂", name:"Security guards",     cost:110, cia:[1,1,2]},
+  {id:"env",    layer:"physical",  icon:"🧯", name:"Fire/UPS protection", cost:80,  cia:[0,0,3]},
+  {id:"train",  layer:"admin",     icon:"🎓", name:"Security training",   cost:40,  cia:[2,1,0]},
+  {id:"policy", layer:"admin",     icon:"📋", name:"Policies & procedures",cost:30, cia:[1,2,0]},
+  {id:"vendor", layer:"admin",     icon:"🤝", name:"Vendor vetting",      cost:45,  cia:[1,1,1]},
+  {id:"checks", layer:"admin",     icon:"🕵️", name:"Background checks",   cost:35,  cia:[2,1,0]},
+  {id:"irplan", layer:"admin",     icon:"🚨", name:"IR plan & drills",    cost:55,  cia:[0,1,2]},
+  {id:"mfa",    layer:"technical", icon:"🔐", name:"MFA",                 cost:65,  cia:[3,1,0]},
+  {id:"patch",  layer:"technical", icon:"🩹", name:"Patching",            cost:55,  cia:[1,2,1]},
+  {id:"edr",    layer:"technical", icon:"🛰️", name:"EDR",                 cost:90,  cia:[1,2,0]},
+  {id:"backup", layer:"technical", icon:"💾", name:"Backups",             cost:60,  cia:[0,1,3]},
+  {id:"crypt",  layer:"technical", icon:"🔏", name:"Encryption",          cost:75,  cia:[3,1,0]},
+  {id:"fw",     layer:"technical", icon:"🧱", name:"Firewall",            cost:70,  cia:[1,1,1]},
+];
+const HOLES_PER_RING={physical:5, admin:5, technical:4}; // 14 gaps, 16 options, ~8 affordable
+const BASE_BUDGET=400, CIA_TARGET=9;
+
+/* ---- levels ---- */
+const LEVELS={
+  analyst:{budget:false, risk:false, title:"Level 1 · Analyst",
+    desc:"Learn the layers. Controls are free — focus on <b>misaligning the gaps</b> and watch how each control moves <b>C · I · A</b>.",
+    launch:"🚨 Launch attack"},
+  manager:{budget:true, risk:false, title:"Level 2 · Security Manager",
+    desc:"Now there’s a budget. <b>More options than gaps, more gaps than money</b> — triage, then buy the longest possible path.",
+    launch:"🚨 Launch attack"},
+  ciso:{budget:true, risk:true, title:"Level 3 · CISO",
+    desc:"Own the risk. Your controls also <b>mitigate threats</b> on the matrix. Run the quarter, survive the attack stream, and answer for the costs.",
+    launch:"📅 Run the quarter"},
+};
+const isPlay=()=>mode!=="watch";
+
+/* ---- threats (CISO risk matrix + SOC feed) ---- */
+/* like/impact: 0 low · 1 med · 2 high. mit reduces likelihood; impMit reduces impact. */
+const THREATS=[
+  {id:"ddos",   icon:"🌊", name:"DDoS",              like:2, impact:0, mit:["fw"],                        impMit:["irplan"],
+   fizz:["burst absorbed at the edge","volumetric flood — CDN soaked it up","booter stresser — barely a blip"]},
+  {id:"phish",  icon:"🎣", name:"Phishing",          like:2, impact:1, mit:["train","mfa"],               impMit:["irplan"],
+   fizz:["wave quarantined by the mail filter","lure reported by staff","credential page taken down"]},
+  {id:"ransom", icon:"🔒", name:"Ransomware",        like:1, impact:2, mit:["patch","edr","train"],       impMit:["backup","irplan"],
+   fizz:["loader crashed on execution","payload flagged by AV","affiliate gave up at the sandbox"]},
+  {id:"insider",icon:"🕶️", name:"Insider threat",    like:1, impact:2, mit:["checks","policy"],           impMit:["irplan"],
+   fizz:["odd data pull — legitimate, on review","disgruntled post noticed by HR","access request denied"]},
+  {id:"supply", icon:"🧩", name:"Supply-chain",      like:1, impact:2, mit:["vendor","patch"],            impMit:["irplan"],
+   fizz:["tampered package caught by checksum","vendor advisory patched in time","suspicious update rolled back"]},
+  {id:"intrude",icon:"🚪", name:"Physical intrusion",like:1, impact:1, mit:["fence","badge","guards","cctv"], impMit:[],
+   fizz:["tailgater turned away at reception","door sensor tripped — patrol found nothing","lock-pick scare: it was the cleaner"]},
+];
+const GENERIC_FIZZ=["🤖 script kiddie scan — nothing found","🧑‍💻 attacker typo’d the exploit — failed",
+  "🌐 mass scanner probing — no exposed services","🎲 opportunist bounced off the WAF","📧 spam cannon — all caught"];
+const IMPACT_COST=[80,220,500]; // $k by effective impact
+const BREACH_FLAVOUR=["emergency incident-response retainer","regulator fine + legal",
+  "reputation hit — churned customers","stock dip after disclosure","weekend rebuild + overtime"];
+
+function placedSet(){const s=new Set(); Object.values(holes).flat().forEach(h=>{if(h.plug)s.add(h.plug);}); return s;}
+function effLike(t){return Math.max(0,t.like - t.mit.filter(id=>placedSet().has(id)).length);}
+function effImpact(t){return Math.max(0,t.impact - t.impMit.filter(id=>placedSet().has(id)).length);}
+function ctlName(id){const c=CONTROLS.find(x=>x.id===id); return c?c.name:id;}
+
+/* ================= state ================= */
+let mode="watch";                 // watch | play
+let holes={};                     // ringId -> [{angle, plug:controlId|null}]
+let anim=null;                    // current animation handle
+let stats={rounds:0, contained:0, breached:0, best:0};
+let budget=BASE_BUDGET;
+let bypassedGlobal=[];            // controls knocked out mid-attack, restored next round
+let quarterCtx={active:false};
+function spentK(){return Object.values(holes).flat().reduce((s,h)=>h.plug?s+CONTROLS.find(c=>c.id===h.plug).cost:s,0);}
+function remainingK(){return (LEVELS[mode]&&!LEVELS[mode].budget)?Infinity:budget-spentK();}
+function ciaPoints(){const s=[0,0,0];
+  Object.values(holes).flat().forEach(h=>{if(h.plug){const c=CONTROLS.find(x=>x.id===h.plug);
+    s[0]+=c.cia[0]; s[1]+=c.cia[1]; s[2]+=c.cia[2];}});
+  return s;}
+function restoreBypassed(){bypassedGlobal.forEach(b=>{if(b.h&&!b.h.plug)b.h.plug=b.ctl;}); bypassedGlobal=[];}
+
+const svg=document.getElementById("scene");
+const $=id=>document.getElementById(id);
+
+/* ================= svg scaffolding ================= */
+const NS="http://www.w3.org/2000/svg";
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);
+  for(const k in attrs)e.setAttribute(k,attrs[k]); (parent||svg).appendChild(e); return e;}
+
+const gRings=el("g",{}), gLabels=el("g",{}), gPlugs=el("g",{}), gCenter=el("g",{}), gAttack=el("g",{});
+
+function arcPath(r,a1,a2,largeArc,sweep){
+  const [x1,y1]=pt(r,a1),[x2,y2]=pt(r,a2);
+  return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${largeArc} ${sweep} ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+}
+
+function drawCenter(){
+  gCenter.innerHTML="";
+  el("circle",{cx:CX,cy:CY,r:112,fill:"#0a1020",stroke:"#22304d","stroke-width":1.5},gCenter);
+  const R=72, verts=[-90,150,30].map(a=>pt(R,a));
+  el("polygon",{points:verts.map(p=>p.join(",")).join(" "),fill:"rgba(251,191,36,.08)",
+    stroke:"var(--cia)","stroke-width":3,"stroke-linejoin":"round"},gCenter);
+  const letters=["C","I","A"], names=["Confidentiality","Integrity","Availability"];
+  const pts=ciaPoints();
+  [-90,150,30].forEach((a,i)=>{
+    const [x,y]=pt(R,a), rr=19;
+    const frac=Math.min(1,pts[i]/CIA_TARGET);
+    const grp=el("g",{},gCenter);
+    el("circle",{cx:x,cy:y,r:rr,fill:"#1c1607",stroke:"var(--cia)","stroke-width":2.5},grp);
+    if(frac>0){ // fill rises from the bottom of the vertex circle
+      const defs=el("defs",{},grp);
+      const cp=el("clipPath",{id:`ciaclip${i}`},defs);
+      el("rect",{x:x-rr,y:y+rr-2*rr*frac,width:2*rr,height:2*rr*frac},cp);
+      el("circle",{cx:x,cy:y,r:rr-1.2,fill:"var(--cia)","fill-opacity":.85,
+        "clip-path":`url(#ciaclip${i})`},grp);
+    }
+    const t=el("text",{x,y:y+1,"text-anchor":"middle","dominant-baseline":"middle",
+      fill:"#fff","font-size":19,"font-weight":800,"paint-order":"stroke",
+      stroke:"#1c1607","stroke-width":3},grp);
+    t.textContent=letters[i];
+    const title=el("title",{},grp);
+    title.textContent=`${names[i]} coverage ≈ ${Math.round(frac*100)}% (from placed controls — conceptual)`;
+  });
+  const t=el("text",{x:CX,y:CY+14,"text-anchor":"middle",fill:"#93a4c3","font-size":13,
+    "font-weight":600,"letter-spacing":"2"},gCenter); t.textContent="ASSETS";
+}
+
+function drawRings(){
+  gRings.innerHTML=""; gPlugs.innerHTML=""; gLabels.innerHTML="";
+  RINGS.forEach(ring=>{
+    const hs=holes[ring.id], rMid=(ring.rIn+ring.rOut)/2, w=ring.rOut-ring.rIn;
+    const sorted=[...hs].sort((a,b)=>a.angle-b.angle);
+    // faint full ring underlay
+    el("circle",{cx:CX,cy:CY,r:rMid,fill:"none",stroke:ring.raw,"stroke-opacity":.12,"stroke-width":w},gRings);
+    // solid segments between holes
+    for(let i=0;i<sorted.length;i++){
+      const a1=norm(sorted[i].angle+HOLE_W/2);
+      const nxt=sorted[(i+1)%sorted.length];
+      const span=norm(nxt.angle-sorted[i].angle)-HOLE_W;
+      if(span<=0.5)continue;
+      el("path",{d:arcPath(rMid,a1,norm(a1+span),span>180?1:0,1),fill:"none",
+        stroke:ring.raw,"stroke-opacity":.85,"stroke-width":w},gRings);
+    }
+    // holes: dashed edges when open, plug chip when plugged
+    hs.forEach((h,idx)=>{
+      const gid=`${ring.id}-${idx}`;
+      if(h.plug){
+        const ctl=CONTROLS.find(c=>c.id===h.plug);
+        el("path",{d:arcPath(rMid,norm(h.angle-HOLE_W/2),norm(h.angle+HOLE_W/2),0,1),fill:"none",
+          stroke:ring.raw,"stroke-width":w,"stroke-opacity":.5},gPlugs);
+        const [bx,by]=pt(rMid,h.angle);
+        const grp=el("g",{class:"plug","data-hole":gid,style:"cursor:pointer"},gPlugs);
+        el("circle",{cx:bx,cy:by,r:16,fill:"#0a1020",stroke:ring.raw,"stroke-width":2.5},grp);
+        const t=el("text",{x:bx,y:by+1,"text-anchor":"middle","dominant-baseline":"middle","font-size":15},grp);
+        t.textContent=ctl.icon;
+        const title=el("title",{},grp); title.textContent=ctl.name+" (click to remove)";
+      }else{
+        [-1,1].forEach(s=>{
+          const a=norm(h.angle+s*HOLE_W/2);
+          const [x1,y1]=pt(ring.rIn,a),[x2,y2]=pt(ring.rOut,a);
+          el("line",{x1,y1,x2,y2,stroke:ring.raw,"stroke-width":1.6,"stroke-dasharray":"4 4","stroke-opacity":.8},gPlugs);
+        });
+        const [hx,hy]=pt(rMid,h.angle);
+        el("circle",{cx:hx,cy:hy,r:w/2-4,fill:"transparent",class:"holezone","data-hole":gid},gPlugs);
+      }
+    });
+    // label at top of ring
+    const [lx,ly]=pt(rMid,-90);
+    const t=el("text",{x:lx,y:ly+4,"text-anchor":"middle",fill:"#0b1220","font-size":15,"font-weight":800,
+      "paint-order":"stroke",stroke:ring.raw,"stroke-width":.4,style:`fill:${ring.raw};filter:drop-shadow(0 0 6px #0b1220)` ,
+      "letter-spacing":".5"},gLabels);
+    t.textContent=ring.label;
+    const bb=t.getBBox();
+    const bg=el("rect",{x:bb.x-8,y:bb.y-3,width:bb.width+16,height:bb.height+6,rx:8,fill:"#0b1220",
+      "fill-opacity":.85,stroke:ring.raw,"stroke-opacity":.35},gLabels);
+    gLabels.insertBefore(bg,t);
+  });
+  drawCenter(); // keep centre above ring fills? centre is inside, fine
+}
+
+/* ================= hole generation ================= */
+function genHoles(alignedDemo){
+  holes={};
+  if(alignedDemo==="aligned"){
+    const R=Math.random()*360; // rotate the whole aligned set so the tunnel is somewhere new each time
+    holes.physical =[35,150,255].map(a=>({angle:norm(a+R),plug:null}));
+    holes.admin    =[35,165,270].map(a=>({angle:norm(a+R),plug:null}));
+    holes.technical=[35,205].map(a=>({angle:norm(a+R),plug:null}));
+  }else if(alignedDemo==="misaligned"||alignedDemo==="staggered"){
+    // deliberately staggered: every hole ≥ ~50° from the nearest hole in the next layer
+    const R=Math.random()*360, j=()=>(Math.random()-.5)*14;
+    holes.physical =[35,155,275].map(a=>({angle:norm(a+R+j()),plug:null}));
+    holes.admin    =[95,215,335].map(a=>({angle:norm(a+R+j()),plug:null}));
+    holes.technical=[155,275].map(a=>({angle:norm(a+R+j()),plug:null}));
+  }else{
+    RINGS.forEach(r=>{
+      const n=HOLES_PER_RING[r.id], base=360/n, off=Math.random()*360, arr=[];
+      for(let i=0;i<n;i++){
+        arr.push({angle:norm(off+i*base+(Math.random()-.5)*(base-HOLE_W-10)),plug:null});
+      }
+      holes[r.id]=arr;
+    });
+  }
+}
+
+/* ================= attack path ================= */
+function openAngles(ringId){return holes[ringId].filter(h=>!h.plug).map(h=>h.angle);}
+
+function bestPath(fixedEntry){
+  // smart attacker: min total search-arc. If fixedEntry is given, the attacker
+  // arrived at a random physical gap and only optimises from there.
+  const P=fixedEntry!==undefined?[fixedEntry]:openAngles("physical");
+  const A=openAngles("admin"),T=openAngles("technical");
+  if(!P.length||!A.length||!T.length)return null;
+  let best=null;
+  P.forEach(p=>A.forEach(a=>T.forEach(t=>{
+    const arc=CORRIDOR[0]*rad(Math.abs(shortest(p,a)))+CORRIDOR[1]*rad(Math.abs(shortest(a,t)));
+    if(!best||arc<best.arc)best={arc,p,a,t};
+  })));
+  return best;
+}
+function randomEntry(){const P=openAngles("physical"); return P[Math.floor(Math.random()*P.length)];}
+
+function buildSegs({p,a,t}){
+  // segments: {d, len, isArc, tag}
+  const segs=[];
+  const add=(d,len,isArc,tag)=>segs.push({d,len,isArc,tag});
+  // entry radial through physical hole
+  const [x0,y0]=pt(ENTRY_R,p), [x1,y1]=pt(CORRIDOR[0],p);
+  add(`M ${x0} ${y0} L ${x1} ${y1}`, ENTRY_R-CORRIDOR[0], false, "phys");
+  // arc corridor 1
+  const d1=shortest(p,a);
+  if(Math.abs(d1)>0.5){
+    add(arcPath(CORRIDOR[0],p,a,0,d1>0?1:0).replace(/^M[^A]*A/,"A"),
+        CORRIDOR[0]*rad(Math.abs(d1)), true, "search1");
+  }
+  // radial through admin
+  const [x2,y2]=pt(CORRIDOR[1],a);
+  add(`L ${x2} ${y2}`, CORRIDOR[0]-CORRIDOR[1], false, "admin");
+  // arc corridor 2
+  const d2=shortest(a,t);
+  if(Math.abs(d2)>0.5){
+    add(arcPath(CORRIDOR[1],a,t,0,d2>0?1:0).replace(/^M[^A]*A/,"A"),
+        CORRIDOR[1]*rad(Math.abs(d2)), true, "search2");
+  }
+  // radial through technical to centre
+  add(`L ${CX} ${CY}`, CORRIDOR[1], false, "tech");
+  return segs;
+}
+function segsToD(segs){
+  return segs.map((s,i)=>{
+    if(i===0)return s.d;
+    if(s.d.startsWith("A")||s.d.startsWith("L"))return s.d;
+    return s.d;
+  }).join(" ");
+}
+function arcTravelled(segs,dist){
+  let acc=0,arc=0;
+  for(const s of segs){
+    const take=Math.max(0,Math.min(s.len,dist-acc));
+    if(s.isArc)arc+=take;
+    acc+=s.len;
+  }
+  return arc;
+}
+function segIndexAt(segs,dist){
+  let acc=0;
+  for(let i=0;i<segs.length;i++){acc+=segs[i].len; if(dist<=acc)return i;}
+  return segs.length-1;
+}
+
+/* ================= animation ================= */
+const NARR={
+  phys:"An attacker slips through a gap in the <b>physical</b> layer…",
+  search1:"Inside, they must <b>search sideways</b> for the next gap — this movement is pure delay. The detection window is filling…",
+  admin:"Found one. Through the <b>administrative</b> layer they go…",
+  search2:"Searching again… every degree they travel is time our monitoring, logging and people have to notice.",
+  tech:"A gap in the <b>technical</b> layer — final push toward the core!",
+};
+
+function stopAnim(){ if(anim){cancelAnimationFrame(anim.raf); anim=null;} gAttack.innerHTML=""; setButtons(true); }
+
+function runAttack(opts){
+  stopAnim(); hideOutcome(); $("banner").className="banner";
+  const choice=opts.entry==="random"?bestPath(randomEntry()):bestPath();
+  if(!choice){caption("Every layer is fully sealed — impossible in this game, and in real life."); return;}
+  const segs=buildSegs(choice);
+  const d=segsToD(segs);
+  const total=segs.reduce((s,x)=>s+x.len,0);
+  const totalArc=segs.reduce((s,x)=>s+(x.isArc?x.len:0),0);
+  // detection threshold (px of search). scripted for watch scenarios, timer-based for play.
+  const base=opts.search0||0;
+  let D;
+  if(opts.Dpx!==undefined) D=opts.Dpx;
+  else if(opts.scenario){
+    D = opts.scenario.type==="detect" ? Math.max(60,totalArc*opts.scenario.frac)
+                                      : totalArc*1.15+60; // breach: meter fills but never triggers
+  } else D=350+Math.random()*550;
+  const narrSet = opts.scenario ? Object.assign({},NARR,opts.scenario.narr) : NARR;
+
+  const probe=el("path",{d,fill:"none",stroke:"none"},gAttack); // for getPointAtLength
+  const pathLen=probe.getTotalLength();
+  const scale=pathLen/total; // analytic vs svg length safety
+  const trail=el("path",{d,fill:"none",stroke:"var(--attack)","stroke-width":4,"stroke-linecap":"round",
+    "stroke-dasharray":`${pathLen} ${pathLen}`,"stroke-dashoffset":pathLen,opacity:.95,
+    style:"filter:drop-shadow(0 0 6px #f8717188)"},gAttack);
+  const dot=el("circle",{r:8,fill:"var(--attack)",style:"filter:drop-shadow(0 0 8px #f87171)"},gAttack);
+
+  let dist=0,last=performance.now(),lastSeg=-1;
+  setButtons(false);
+  function frame(now){
+    if(!anim)return;
+    dist+=SPEED*(now-last)/1000; last=now;
+    const p=probe.getPointAtLength(Math.min(dist*scale,pathLen));
+    dot.setAttribute("cx",p.x); dot.setAttribute("cy",p.y);
+    trail.setAttribute("stroke-dashoffset",Math.max(0,pathLen-dist*scale));
+    const arc=base+arcTravelled(segs,dist);
+    const delaySec=arc/SPEED;
+    if(opts.Dpx!==undefined)
+      $("delayReadout").textContent=`SOC detects in ${Math.max(0,(D-arc)/SPEED).toFixed(1)}s (while attacker hunts)`;
+    else $("delayReadout").textContent=`delay: ${delaySec.toFixed(1)}s`;
+    $("meterFill").style.width=Math.min(100,arc/D*100)+"%";
+    const si=segIndexAt(segs,dist);
+    if(si!==lastSeg){lastSeg=si; const tag=segs[si]&&segs[si].tag; if(narrSet[tag])caption(narrSet[tag]);}
+    if(arc>=D){ intercept(p,choice,segs,delaySec,opts); return; }
+    if(dist>=total){ breach(choice,segs,delaySec,opts); return; }
+    anim.raf=requestAnimationFrame(frame);
+  }
+  anim={raf:requestAnimationFrame(frame)};
+}
+
+function intercept(p,choice,segs,delaySec,opts){
+  anim=null; setButtons(true);
+  const sc=opts.scenario;
+  const b=$("banner"); b.textContent=sc?sc.banner:"🛰 SOC alert — anomaly detected. Attack contained."; b.className="banner show";
+  const ring=el("circle",{cx:p.x,cy:p.y,r:7,fill:"none",stroke:"var(--good)","stroke-width":3,
+    style:"animation:pulse 1s infinite"},gAttack);
+  caption(`<b>Contained!</b> The attacker spent <b>${delaySec.toFixed(1)}s</b> searching between layers — long enough for detection to fire before the core was reached. Delay is a security outcome.`);
+  if(sc){
+    showOutcome(true,`🛡 ${sc.title} — contained after ${delaySec.toFixed(1)}s`,sc.epilogue,
+      forensicsList(choice,delaySec,false));
+  }
+  if(opts.mode==="play"){
+    stats.rounds++; stats.contained++;
+    stats.best=Math.max(stats.best,delaySec); renderStats();
+    if(quarterCtx.active){
+      const t=quarterCtx.threat, avoided=IMPACT_COST[effImpact(t)];
+      quarterCtx.active=false;
+      showOutcome(true,`🛡 ${t.icon} ${t.name} contained after ${delaySec.toFixed(1)}s`,
+        `The layers held. Time for the board report — was the spend worth it?`,
+        [...quarterCostLines(),
+         `${t.icon} the ${t.name.toLowerCase()} that escalated was contained before the core`,
+         `💥 a breach of this type would likely have cost ~$${avoided}k`,
+         `verdict: $${spentK()}k of controls vs ~$${avoided}k avoided — ${avoided>=spentK()?"<b>defence paid for itself this quarter</b>":"this one attack didn’t repay the spend, but the quarter’s "+quarterCtx.fizzled+" fizzled attempts did"}`]);
+    }else{
+      showOutcome(true,`🛡 Contained after ${delaySec.toFixed(1)}s of attacker movement`,
+        `Your gap placement forced a long search path. Detection triggered before assets were touched. Reshuffle and try to beat your best delay — and remember: a lucky attacker can still slip through. Risk is never zero.`,
+        forensicsList(choice,delaySec,false));
+    }
+  }
+}
+
+function breach(choice,segs,delaySec,opts){
+  anim=null; setButtons(true);
+  const sc=opts.scenario;
+  const b=$("banner"); b.textContent=sc?sc.banner:"🚨 BREACH — assets reached. Switching to forensics."; b.className="banner bad show";
+  el("circle",{cx:CX,cy:CY,r:118,fill:"rgba(248,113,113,.12)",stroke:"var(--bad)","stroke-width":2,
+    style:"animation:pulse 1.2s infinite"},gAttack);
+  caption(`<b>Breach.</b> The gaps ${delaySec<1.5?"lined up — a near-straight shot to the core":"didn’t buy enough time (or nobody was watching)"}. Prevention failed, so we move into <b>forensics</b>: reconstruct the path, learn, re-layer.`);
+  if(sc){
+    showOutcome(false,`🔍 ${sc.title} → forensics`,sc.epilogue,
+      forensicsList(choice,delaySec,true));
+  }
+  if(opts.mode==="play"){
+    stats.rounds++; stats.breached++; renderStats();
+    if(quarterCtx.active){
+      const t=quarterCtx.threat, cost=IMPACT_COST[effImpact(t)];
+      const flavour=BREACH_FLAVOUR[Math.floor(Math.random()*BREACH_FLAVOUR.length)];
+      quarterCtx.active=false;
+      showOutcome(false,`🔍 ${t.icon} ${t.name} breach → forensics`,
+        `It reached the core. The quarter’s bill just arrived:`,
+        [...quarterCostLines(),
+         `💥 breach cost ~$${cost}k (${flavour})${t.impMit.length&&effImpact(t)<t.impact?" — softened by your impact controls":""}`,
+         ...forensicsList(choice,delaySec,true),
+         `verdict: $${spentK()}k of controls AND a $${cost}k breach — total $${spentK()+cost}k. What would you change: cheaper controls, or better placement?`]);
+    }else{
+      showOutcome(false,`🔍 Breach → forensics (only ${delaySec.toFixed(1)}s of delay)`,
+        `The attack reached the CIA core before detection fired. Forensic timeline reconstruction:`,
+        forensicsList(choice,delaySec,true));
+    }
+  }
+}
+
+function hopDesc(deg,layerName){
+  if(deg<22) return `⚠ almost no searching to find the ${layerName} gap — <b>these gaps were nearly lined up</b>`;
+  if(deg<60) return `a moderate hunt to find the ${layerName} gap`;
+  return `a long, exposed search to find the ${layerName} gap — good misalignment`;
+}
+function forensicsList(choice,delaySec,isBreach){
+  const s1=Math.abs(shortest(choice.p,choice.a));
+  const s2=Math.abs(shortest(choice.a,choice.t));
+  const items=[
+    `T+0.0s — entry through a gap in the physical layer`,
+    hopDesc(s1,"administrative"),
+    hopDesc(s2,"technical"),
+    isBreach?`assets reached after only ${delaySec.toFixed(1)}s of searching`
+            :`intercepted after ${delaySec.toFixed(1)}s — the layers did their job.`,
+  ];
+  if(isBreach&&Math.min(s1,s2)<22)
+    items.push(`verdict: the layers were effectively one hole — re-position controls to break the straight line.`);
+  else if(isBreach)
+    items.push(`verdict: decent misalignment, but not enough time — every extra degree of separation helps.`);
+  return items;
+}
+
+/* ================= ui helpers ================= */
+function caption(html){$("caption").innerHTML=html;}
+function setButtons(on){["btnRandom","btnDetect","btnBreach","btnLaunch","btnShuffle","btnFund"].forEach(id=>{const e=$(id); if(e)e.disabled=!on;});}
+function renderStats(){
+  $("stRounds").textContent=stats.rounds;
+  $("stContained").textContent=stats.contained;
+  $("stBreached").textContent=stats.breached;
+  $("stBest").textContent=stats.best?stats.best.toFixed(1)+"s":"–";
+}
+let ovTimer=null;
+function showOutcome(good,head,body,list){
+  $("ovCard").className="ov-card "+(good?"good":"bad");
+  $("outHead").textContent=head; $("outBody").innerHTML=body;
+  $("outForensics").innerHTML=list.map(x=>`<li>${x}</li>`).join("");
+  $("ovAction").textContent = mode==="watch" ? "🎲 Another scenario" : mode==="ciso" ? "📅 New quarter" : "▶ New round";
+  clearTimeout(ovTimer);
+  ovTimer=setTimeout(()=>$("overlay").classList.add("show"),950); // let the pulse land first
+}
+function closeOverlay(){$("overlay").classList.remove("show");}
+function hideOutcome(){clearTimeout(ovTimer); ovTimer=null; closeOverlay();
+  $("meterFill").style.width="0%"; $("delayReadout").textContent="delay: 0.0s";}
+$("ovClose").onclick=closeOverlay;
+$("ovAction").onclick=()=>{closeOverlay(); (mode==="watch"?$("btnRandom"):$("btnShuffle")).click();};
+$("overlay").addEventListener("click",e=>{if(e.target.id==="overlay")closeOverlay();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeOverlay();});
+
+/* ================= SOC feed (attack stream) ================= */
+let clockMin=9*60+2+Math.floor(Math.random()*40);
+function fakeClock(){clockMin+=1+Math.floor(Math.random()*7);
+  return `${String(Math.floor(clockMin/60)%24).padStart(2,"0")}:${String(clockMin%60).padStart(2,"0")}`;}
+function streamLine(html,cls){
+  const s=$("stream"), d=document.createElement("div");
+  d.className="sl"+(cls?" "+cls:""); d.innerHTML=`${fakeClock()} ${html}`;
+  s.appendChild(d);
+  while(s.children.length>5)s.removeChild(s.firstChild);
+}
+function pickWeighted(){
+  const w=THREATS.map(t=>[1,3,7][effLike(t)]);
+  let r=Math.random()*w.reduce((a,b)=>a+b,0);
+  for(let i=0;i<THREATS.length;i++){r-=w[i]; if(r<=0)return THREATS[i];}
+  return THREATS[0];
+}
+function fizzLine(t){
+  const placedMit=t.mit.filter(id=>placedSet().has(id));
+  if(placedMit.length&&Math.random()<0.65)
+    return {html:`${t.icon} ${t.name} attempt — <b>blocked by ${ctlName(placedMit[Math.floor(Math.random()*placedMit.length)])}</b>`,cls:"blocked"};
+  if(Math.random()<0.25)
+    return {html:GENERIC_FIZZ[Math.floor(Math.random()*GENERIC_FIZZ.length)],cls:""};
+  return {html:`${t.icon} ${t.name} — ${t.fizz[Math.floor(Math.random()*t.fizz.length)]}`,cls:""};
+}
+function ambientTick(){
+  if(quarterCtx.active||anim)return;           // real drama pauses the ambience
+  const l=fizzLine(pickWeighted());
+  streamLine(l.html,l.cls);
+}
+setInterval(ambientTick,3400);
+setTimeout(ambientTick,700); setTimeout(ambientTick,1900);
+
+/* ================= risk matrix (CISO) ================= */
+function renderMatrix(pulseId){
+  const g=$("rmGrid"); g.innerHTML="";
+  for(let imp=2;imp>=0;imp--)for(let lik=0;lik<=2;lik++){
+    const cell=document.createElement("div");
+    cell.className=`rmc s${imp+lik}`;
+    THREATS.forEach(t=>{
+      if(effImpact(t)===imp&&effLike(t)===lik){
+        const chip=document.createElement("span");
+        chip.className="rmt"+(t.id===pulseId?" pulse":"");
+        chip.textContent=t.icon;
+        const L=["low","med","high"];
+        chip.title=`${t.name}\nlikelihood ${L[effLike(t)]} (base ${L[t.like]}) · impact ${L[effImpact(t)]} (base ${L[t.impact]})\nless likely with: ${t.mit.map(ctlName).join(", ")}${t.impMit.length?`\nsofter impact with: ${t.impMit.map(ctlName).join(", ")}`:""}`;
+        cell.appendChild(chip);
+      }
+    });
+    g.appendChild(cell);
+  }
+}
+
+/* ================= watch mode: story scenarios ================= */
+const SCENARIOS=[
+ {type:"detect", frac:0.32, title:"The curious employee",
+  banner:"🧍 “Can I help you?” — challenged by staff",
+  narr:{phys:"A stranger tailgates through the loading dock behind a delivery…",
+        search1:"No badge, no escort — they wander the corridor, trying doors, reading name plates…"},
+  epilogue:"An employee noticed someone without a badge and simply asked, <b>“Can I help you? Who are you here to see?”</b> The intruder made excuses and left. Security culture is a control — your people are one of the layers."},
+ {type:"detect", frac:0.55, title:"The night-shift guard",
+  banner:"📷 CCTV operator dispatches security",
+  narr:{phys:"2:14&nbsp;am — someone slips through a cut in the back fence…",
+        search1:"They keep to the shadows, probing for an unlocked entrance…",
+        admin:"A propped-open smokers’ door gets them inside…"},
+  epilogue:"The guard reviewing camera feeds spotted movement in a blind-spot handover and dispatched a patrol. The intruder was met in the corridor. <b>Monitoring turned the attacker’s delay into detection</b> — exactly what the layers are for."},
+ {type:"detect", frac:0.72, title:"The suspicious request",
+  banner:"🎓 Trained employee reports it to the SOC",
+  narr:{phys:"A cloned contractor badge gets the attacker through the front gate…",
+        admin:"Posing as IT support, they ask a staff member to “verify” their password…",
+        search2:"The employee hesitates… this doesn’t follow procedure…"},
+  epilogue:"Security-awareness training paid off: the employee refused, reported it, and the SOC correlated the report with the badge anomaly. <b>Administrative controls detect as well as prevent.</b>"},
+ {type:"detect", frac:0.9, title:"The 3 am beacon",
+  banner:"🛰 EDR flags lateral movement — host isolated",
+  narr:{phys:"The attacker is already inside the building…",
+        admin:"A shared account gets them onto the network…",
+        search2:"They probe host after host, hunting for the crown jewels…",
+        tech:"They reach for the database server—"},
+  epilogue:"At the very last layer, EDR flagged unusual lateral movement and the SOC isolated the host seconds before data access. Uncomfortably close — and the point: <b>any single save is luck; the layered system is design.</b>"},
+ {type:"breach", layout:"aligned", title:"Everything lined up",
+  banner:"🚨 BREACH — the holes lined up",
+  narr:{phys:"A fire door propped open with a brick — straight through…",
+        admin:"Visitor policy? Nobody checks escorts on level 2…",
+        tech:"…and the file server missed six months of patches."},
+  epilogue:"Propped door → unenforced policy → unpatched server: three small, forgivable holes, perfectly aligned, became one straight tunnel to the assets. Now it’s <b>forensics</b>: reconstruct the path, then re-layer so these can never line up again."},
+ {type:"breach", title:"The quiet Sunday",
+  banner:"🚨 BREACH — nobody was watching the alerts",
+  narr:{search1:"The layers force a long, noisy search — alerts are landing in the queue…",
+        search2:"…but it’s Sunday morning, the SOC is unstaffed, and nobody is looking."},
+  epilogue:"The layers did their job — hours of delay and a trail of alerts — but detection needs <b>people and process watching</b>, and this time there weren’t any. Risk never reaches zero; response capacity is a layer too. Into forensics we go."},
+];
+const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
+function playScenario(sc){
+  stopAnim(); hideOutcome(); $("banner").className="banner";
+  if(sc.layout==="aligned")genHoles("aligned");
+  else genHoles("staggered");
+  drawRings();
+  caption(`<b>${sc.title}</b> — watch the layers work…`);
+  setTimeout(()=>runAttack({mode:"watch",scenario:sc,
+    entry:sc.layout==="aligned"?undefined:"random"}),600);
+}
+$("btnRandom").onclick=()=>playScenario(pick(SCENARIOS));
+$("btnDetect").onclick=()=>playScenario(pick(SCENARIOS.filter(s=>s.type==="detect")));
+$("btnBreach").onclick=()=>playScenario(pick(SCENARIOS.filter(s=>s.type==="breach")));
+
+/* ================= play mode: drag & drop ================= */
+const tray=$("tray"), ghost=$("dragGhost");
+let dragging=null;
+
+function buildTray(){
+  tray.innerHTML="";
+  const rem=remainingK();
+  RINGS.forEach(ring=>{
+    const grp=document.createElement("div");
+    grp.className="grp"; grp.style.color=ring.raw;
+    const open=holes[ring.id].filter(h=>!h.plug).length;
+    grp.textContent=`${ring.label} · ${open} gap${open===1?"":"s"} open`;
+    tray.appendChild(grp);
+    CONTROLS.filter(c=>c.layer===ring.id).forEach(c=>{
+      const hasBudget=LEVELS[mode]?LEVELS[mode].budget:true;
+      const placed=Object.values(holes).flat().some(h=>h.plug===c.id);
+      const broke=hasBudget&&!placed&&c.cost>rem;
+      const chip=document.createElement("div");
+      chip.className="chip"+(placed?" placed":broke?" cantafford":"");
+      chip.dataset.layer=c.layer; chip.dataset.id=c.id;
+      chip.innerHTML=`<span>${c.icon}</span>${c.name}${hasBudget?`<span class="cost">$${c.cost}k</span>`:""}`;
+      const mits=THREATS.filter(t=>t.mit.includes(c.id)).map(t=>t.icon+t.name);
+      chip.title=broke?`Can’t afford (needs $${c.cost}k, you have $${rem}k)`:
+        `C+${c.cia[0]} I+${c.cia[1]} A+${c.cia[2]}${mits.length?` · mitigates ${mits.join(", ")}`:""}`;
+      tray.appendChild(chip);
+      if(!placed&&!broke)chip.addEventListener("pointerdown",startDrag);
+    });
+  });
+  const placedN=Object.values(holes).flat().filter(h=>h.plug).length;
+  const gapsN=Object.values(holes).flat().length;
+  $("trayCount").textContent=`${gapsN-placedN} gaps open`;
+  $("budgetLine").innerHTML=(LEVELS[mode]&&!LEVELS[mode].budget)
+    ?`<span class="un">No budget at this level — every control is available.</span>`
+    :`💰 Budget $${budget}k <span class="un">· unspent $${rem}k · controls cost $${CONTROLS.reduce((s,c)=>s+c.cost,0)}k in total</span>`;
+  if(LEVELS[mode]&&LEVELS[mode].risk)renderMatrix();
+  const p=ciaPoints();
+  $("ciaReadout").innerHTML=`CIA coverage (watch the triangle fill): <b>C ${Math.round(Math.min(1,p[0]/CIA_TARGET)*100)}%</b> · <b>I ${Math.round(Math.min(1,p[1]/CIA_TARGET)*100)}%</b> · <b>A ${Math.round(Math.min(1,p[2]/CIA_TARGET)*100)}%</b> — every control moves them differently; no decision is made in isolation.`;
+}
+
+function holeScreenPos(ringId,idx){
+  const ring=RINGS.find(r=>r.id===ringId), h=holes[ringId][idx];
+  const [x,y]=pt((ring.rIn+ring.rOut)/2,h.angle);
+  const p=svg.createSVGPoint(); p.x=x; p.y=y;
+  const sp=p.matrixTransform(svg.getScreenCTM());
+  return {x:sp.x,y:sp.y};
+}
+
+function startDrag(e){
+  if(anim||quarterCtx.active)return;
+  e.preventDefault();
+  const id=e.currentTarget.dataset.id;
+  dragging={id, layer:e.currentTarget.dataset.layer};
+  ghost.innerHTML=e.currentTarget.outerHTML;
+  ghost.firstChild.classList.remove("placed");
+  ghost.style.display="block";
+  moveGhost(e);
+  highlightTargets(dragging.layer,true);
+  window.addEventListener("pointermove",moveGhost);
+  window.addEventListener("pointerup",endDrag,{once:true});
+}
+function moveGhost(e){ghost.style.left=e.clientX+"px"; ghost.style.top=e.clientY+"px";}
+function endDrag(e){
+  window.removeEventListener("pointermove",moveGhost);
+  ghost.style.display="none";
+  highlightTargets(dragging.layer,false);
+  // nearest open hole of matching layer within 55px
+  let best=null;
+  holes[dragging.layer].forEach((h,idx)=>{
+    if(h.plug)return;
+    const p=holeScreenPos(dragging.layer,idx);
+    const d=Math.hypot(p.x-e.clientX,p.y-e.clientY);
+    if(d<55&&(!best||d<best.d))best={idx,d};
+  });
+  if(best!==null&&best!==undefined&&best.idx!==undefined){
+    holes[dragging.layer][best.idx].plug=dragging.id;
+    drawRings(); buildTray(); hideOutcome();
+    caption(`Plugged a <b>${dragging.layer}</b> gap. ${remainingHint()}`);
+  }
+  dragging=null;
+}
+function remainingHint(){
+  const open=Object.values(holes).flat().filter(h=>!h.plug).length;
+  const rem=remainingK();
+  const affordable=CONTROLS.filter(c=>!Object.values(holes).flat().some(h=>h.plug===c.id)&&c.cost<=rem).length;
+  return affordable>0?`$${rem}k unspent (${affordable} option${affordable>1?"s":""} still affordable) · ${open} gaps open.`
+    :`Budget exhausted — ${open} gaps stay open. Make sure they don’t line up, then launch the attack (or 💰 seek funding).`;
+}
+function highlightTargets(layer,on){
+  svg.querySelectorAll(".holezone").forEach(z=>{
+    if(z.dataset.hole.startsWith(layer)){
+      z.setAttribute("fill",on?"rgba(255,255,255,.14)":"transparent");
+      z.setAttribute("stroke",on?"#fff":"none");
+      z.setAttribute("stroke-dasharray","3 3");
+    }
+  });
+}
+// click plug to remove
+svg.addEventListener("click",e=>{
+  const g=e.target.closest(".plug");
+  if(!g||anim||quarterCtx.active)return;
+  const [ringId,idx]=g.dataset.hole.split("-");
+  holes[ringId][+idx].plug=null;
+  drawRings(); buildTray();
+  caption("Control returned to the tray.");
+});
+
+/* ---- play mode: attack with SOC timer + bounce phase when a layer is sealed ---- */
+function playAttack(){
+  stopAnim(); hideOutcome(); $("banner").className="banner";
+  restoreBypassed(); drawRings(); buildTray();
+  if(!quarterCtx.active)streamLine("⚠ intrusion in progress — <b>tracer active</b>","alert");
+  const T=1.0+Math.random()*2.8;            // seconds of hunting before the SOC catches on
+  const Dpx=T*SPEED;
+  let searchPx=0, attempts=0;
+  const log=[];
+  setButtons(false);
+  proceed();
+
+  function proceed(){
+    if(bestPath()){ runAttack({mode:"play",Dpx,search0:searchPx,entry:"random"}); return; }
+    const sealed=RINGS.find(r=>holes[r.id].every(h=>h.plug));
+    if(!sealed){ setButtons(true); return; }
+    bounce(sealed);
+  }
+  function bounce(ring){
+    attempts++;
+    const hs=holes[ring.id], h=hs[Math.floor(Math.random()*hs.length)];
+    const ctl=CONTROLS.find(c=>c.id===h.plug);
+    caption(`Every <b>${ring.label.toLowerCase().replace(" controls","")}</b> gap is plugged — so the attacker <b>bounces</b>: probing ${ctl.name}, retreating, trying again… (attempt ${attempts}). Each attempt burns their time.`);
+    const A=pt(ring.rOut+30,h.angle), B=pt((ring.rIn+ring.rOut)/2,h.angle);
+    const dot=el("circle",{r:8,fill:"var(--attack)",style:"filter:drop-shadow(0 0 8px #f87171)"},gAttack);
+    const dur=1100; let t0=null,lastT=null;
+    anim={raf:requestAnimationFrame(step)};
+    function step(now){
+      if(!anim)return;
+      if(t0===null){t0=now;lastT=now;}
+      let u=Math.min(1,(now-t0)/dur);
+      const k=u<0.5?u*2:2-2*u;                       // in, then bounced back out
+      dot.setAttribute("cx",A[0]+(B[0]-A[0])*k);
+      dot.setAttribute("cy",A[1]+(B[1]-A[1])*k);
+      searchPx+=SPEED*((now-lastT)/1000)*0.9; lastT=now; // probing counts as hunting time
+      $("meterFill").style.width=Math.min(100,searchPx/Dpx*100)+"%";
+      $("delayReadout").textContent=`SOC detects in ${Math.max(0,(Dpx-searchPx)/SPEED).toFixed(1)}s (while attacker hunts)`;
+      if(searchPx>=Dpx){ interceptBounce({x:+dot.getAttribute("cx"),y:+dot.getAttribute("cy")}); return; }
+      if(u>=1){ dot.remove(); afterBounce(ring,h,ctl); return; }
+      anim.raf=requestAnimationFrame(step);
+    }
+  }
+  function afterBounce(ring,h,ctl){
+    log.push(`probed ${ctl.name} (${ring.label.toLowerCase()})`);
+    if(Math.random()<0.09){
+      bypassedGlobal.push({h,ctl:ctl.id}); h.plug=null; drawRings(); buildTray();
+      caption(`💥 <b>${ctl.name} fails</b> under a novel technique — no control is perfect. The attacker is through this layer!`);
+      log.push(`💥 ${ctl.name} bypassed — a control failed`);
+      setTimeout(proceed,750);
+    }else setTimeout(proceed,120);
+  }
+  function interceptBounce(p){
+    anim=null; setButtons(true);
+    const dSec=searchPx/SPEED;
+    const b=$("banner"); b.textContent="🛰 Repeated probing lit up the SOC — attacker locked out"; b.className="banner show";
+    el("circle",{cx:p.x,cy:p.y,r:7,fill:"none",stroke:"var(--good)","stroke-width":3,
+      style:"animation:pulse 1s infinite"},gAttack);
+    caption(`<b>Contained!</b> With a layer fully sealed, the attacker was forced into ${attempts} noisy attempts — the SOC noticed. But you saw the dice roll: <b>a control can always fail. Risk is never zero.</b>`);
+    stats.rounds++; stats.contained++; stats.best=Math.max(stats.best,dSec); renderStats();
+    if(quarterCtx.active){
+      const t=quarterCtx.threat, avoided=IMPACT_COST[effImpact(t)];
+      quarterCtx.active=false;
+      showOutcome(true,`🛡 ${t.icon} ${t.name} locked out after ${attempts} probing attempts`,
+        `A sealed layer made the attacker loud and slow — the SOC noticed. The board report:`,
+        [...quarterCostLines(),...log,`💥 a breach of this type would likely have cost ~$${avoided}k`,
+         `verdict: $${spentK()}k of controls vs ~$${avoided}k avoided`]);
+    }else{
+      showOutcome(true,`🛡 Contained after ${dSec.toFixed(1)}s of probing (${attempts} attempts)`,
+        `Sealing a layer doesn’t make you safe — it makes the attacker <b>loud and slow</b>, which is what detection needs.`,log);
+    }
+  }
+}
+
+/* ---- funding ---- */
+const FUND_NO=[
+  "CFO: “Not this quarter.”","Board: “Show us the risk numbers again.”",
+  "Finance: “There’s a hiring freeze — security too.”","“Didn’t we buy a firewall in 2019?”"];
+$("btnFund").onclick=()=>{
+  if(anim)return;
+  const roll=Math.random();
+  if(roll<0.5){ caption(`💸 Funding request <b>rejected</b>. ${FUND_NO[Math.floor(Math.random()*FUND_NO.length)]} Work with what you have — prioritise.`); }
+  else if(roll<0.92){ const g=50+Math.round(Math.random()*10)*10;
+    budget+=g; buildTray();
+    caption(`💰 Funding approved: <b>+$${g}k</b>. Spend it where it breaks up alignments — not just where it’s shiny.`); }
+  else{ const g=400+Math.round(Math.random()*20)*10;
+    budget+=g; buildTray();
+    caption(`🎉 <b>Windfall: +$${g}k!</b> A breach at a competitor made headlines and the board suddenly cares. You might even afford everything — but watch what happens anyway…`); }
+};
+
+/* ---- CISO: run the quarter ---- */
+function runQuarter(){
+  if(anim||quarterCtx.active)return;
+  hideOutcome(); restoreBypassed(); drawRings(); buildTray();
+  quarterCtx={active:true,attempts:0,fizzled:0,threat:null};
+  setButtons(false);
+  caption("📅 The quarter begins. Watch the SOC feed — most attempts will fizzle against your posture… most.");
+  const totalAttempts=7+Math.floor(Math.random()*3);
+  (function step(){
+    if(!quarterCtx.active)return;
+    if(quarterCtx.attempts>=totalAttempts){quietQuarter(); return;}
+    quarterCtx.attempts++;
+    const t=pickWeighted();
+    renderMatrix(t.id);
+    const pEsc=[0.05,0.14,0.30][effLike(t)];
+    if(Math.random()<pEsc){
+      quarterCtx.threat=t;
+      streamLine(`⚠ ${t.icon} ${t.name} — <b>ESCALATING: intrusion in progress</b>`,"alert");
+      caption(`🚨 A <b>${t.name.toLowerCase()}</b> attempt got past the noise — tracer active. Watch the layers…`);
+      setTimeout(playAttack,900);
+    }else{
+      quarterCtx.fizzled++;
+      const l=fizzLine(t); streamLine(l.html,l.cls);
+      setTimeout(step,1250+Math.random()*750);
+    }
+  })();
+}
+function quarterCostLines(){
+  return [`📅 ${quarterCtx.attempts} attack attempts this quarter`,
+          `🛡 ${quarterCtx.fizzled} fizzled or were blocked before reaching the layers`,
+          `💸 controls on the board: $${spentK()}k`];
+}
+function quietQuarter(){
+  quarterCtx.active=false; setButtons(true);
+  const avoided=quarterCtx.fizzled*25;
+  showOutcome(true,"📊 A quiet quarter — this time",
+    `Nothing escalated. That’s not “nothing happened” — your posture and a little luck turned ${quarterCtx.fizzled} attempts into noise. <b>Security success is invisible;</b> this report is how you prove it was worth paying for.`,
+    [...quarterCostLines(),`≈ $${avoided}k of nuisance and clean-up avoided (rough estimate)`,
+     `verdict: $${spentK()}k spent vs ~$${avoided}k avoided — ${avoided>=spentK()?"defence paid for itself":"looks expensive this quarter, but quarters compound"}`]);
+  caption("📊 Quarter over — a quiet one. Read the report, then run another or re-balance your controls.");
+}
+
+$("btnLaunch").onclick=()=>{ mode==="ciso"?runQuarter():playAttack(); };
+$("btnShuffle").onclick=()=>{stopAnim(); hideOutcome(); restoreBypassed(); quarterCtx={active:false};
+  genHoles(); budget=BASE_BUDGET; drawRings(); buildTray();
+  caption(mode==="ciso"?"🗓 New quarter: fresh gaps, budget reset. Mitigate what the matrix says matters — then run the quarter."
+                       :"New round: fresh gaps"+(LEVELS[mode].budget?", budget reset to $"+BASE_BUDGET+"k":"")+". Place controls so the open gaps never line up — then launch the attack.");};
+
+/* ================= mode switching ================= */
+const TABS={watch:"tabWatch",analyst:"tabL1",manager:"tabL2",ciso:"tabL3"};
+function setMode(m){
+  mode=m; stopAnim(); hideOutcome(); quarterCtx={active:false}; $("banner").className="banner";
+  Object.entries(TABS).forEach(([k,id])=>$(id).classList.toggle("active",m===k));
+  $("watchPanel").classList.toggle("mode-hide",m!=="watch");
+  $("playPanel").classList.toggle("mode-hide",!isPlay());
+  $("statsCard").classList.toggle("mode-hide",!isPlay());
+  $("riskCard").classList.toggle("mode-hide",!(isPlay()&&LEVELS[m].risk));
+  if(m==="watch"){
+    genHoles("misaligned"); drawRings();
+    caption("Pick a button — each click plays a <b>randomly chosen story</b>: sometimes a stranger gets challenged by staff, sometimes CCTV or EDR saves the day… and sometimes the holes line up.");
+  }else{
+    const L=LEVELS[m];
+    $("lvlTitle").innerHTML=`${L.title} <span id="trayCount" style="float:right"></span>`;
+    $("lvlDesc").innerHTML=L.desc;
+    $("btnLaunch").textContent=L.launch;
+    $("btnFund").style.display=L.budget?"":"none";
+    genHoles(); budget=BASE_BUDGET; drawRings(); buildTray();
+    caption(m==="analyst"
+      ?`<b>${Object.values(holes).flat().length} gaps</b>, all 16 controls free. Plug gaps so the open ones never line up, and watch the <b>C-I-A vertices fill differently</b> depending on what you choose. Then 🚨 launch the attack.`
+      :m==="manager"
+      ?`<b>${Object.values(holes).flat().length} gaps</b>, <b>${CONTROLS.length} options</b>, only <b>$${BASE_BUDGET}k</b>. Triage: buy the longest possible path, then 🚨 launch the attack.`
+      :`Same board, bigger job: your controls now also <b>drag threats across the risk matrix</b>. Position for misalignment AND mitigation — then 📅 run the quarter and see the bill.`);
+  }
+}
+$("tabWatch").onclick=()=>setMode("watch");
+$("tabL1").onclick=()=>setMode("analyst");
+$("tabL2").onclick=()=>setMode("manager");
+$("tabL3").onclick=()=>setMode("ciso");
+
+/* ================= boot ================= */
+setMode("watch");
+</script>
+</body>
+</html>
