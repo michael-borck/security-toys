@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Query Builder — watch the SQL assemble as you type</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2e; --panel2:#0e1626; --line:#22304d;
+    --ink:#e6edf7; --muted:#93a4c3;
+    --data:#2dd4bf; --code:#f87171; --bound:#a78bfa;
+    --accent:#fbbf24; --good:#34d399; --bad:#f87171;
+    --fs:16px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:radial-gradient(1200px 800px at 30% -10%, #16223c 0%, var(--bg) 55%);
+    color:var(--ink); font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:var(--fs); min-height:100vh; padding:20px clamp(14px,3vw,28px) 40px;
+  }
+  body.present{--fs:20px;}
+  header,main,footer{max-width:1120px; margin-left:auto; margin-right:auto;}
+  header{margin-bottom:16px;}
+  h1{font-size:1.45em; letter-spacing:.3px;}
+  h1 span{color:var(--accent);}
+  .sub{color:var(--muted); font-size:.85em; margin-top:6px; max-width:74ch; line-height:1.55;}
+  main{display:grid; gap:14px; grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px;}
+  .card.wide{grid-column:1 / -1;}
+  h3{font-size:.72em; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted); margin-bottom:10px;}
+
+  label.f{display:block; font-size:.76em; color:var(--muted); margin:0 0 5px;}
+  input[type=text]{
+    width:100%; background:#080e1c; border:1px solid var(--line); border-radius:9px;
+    color:var(--ink); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:.92em; padding:10px 12px; margin-bottom:11px;
+  }
+  input[type=text]:focus{outline:2px solid #3b82f6; outline-offset:1px;}
+  .chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;}
+  .chip{background:var(--panel2); border:1px solid var(--line); color:var(--muted);
+        border-radius:8px; padding:6px 9px; font-size:.7em; cursor:pointer; text-align:left;}
+  .chip:hover{color:var(--ink); border-color:#3b82f6;}
+  .chip b{display:block; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--ink);
+          font-weight:600; margin-bottom:1px;}
+
+  .opts{display:flex; gap:7px; margin-bottom:12px;}
+  .opt{flex:1; background:var(--panel2); border:1px solid var(--line); color:var(--muted);
+       border-radius:10px; padding:9px 11px; cursor:pointer; font-size:.78em; font-weight:600;
+       text-align:left; line-height:1.3;}
+  .opt small{display:block; font-weight:400; font-size:.85em; opacity:.75; margin-top:2px;}
+  .opt:hover{color:var(--ink);}
+  .opt[aria-pressed=true]{color:var(--ink); border-color:#3b82f6;
+    background:linear-gradient(180deg,#1a2a4a,#12203d); box-shadow:0 0 0 1px #3b82f655;}
+
+  pre{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.78em; line-height:1.7;
+      background:#080e1c; border:1px solid var(--line); border-radius:10px; padding:11px 13px;
+      overflow-x:auto; white-space:pre-wrap; word-break:break-word;}
+  pre .kw{color:#7aa2e3;}
+  pre .lit{color:var(--muted);}
+  pre .data{color:var(--data); background:#2dd4bf1a; border-radius:3px;}
+  pre .code{color:var(--code); background:#f871711a; border-radius:3px; font-weight:700;}
+  pre .bound{color:var(--bound); background:#a78bfa1a; border-radius:3px;}
+  pre .cmt{color:var(--dead,#5b6b8c); text-decoration:line-through; opacity:.6;}
+
+  .key{display:flex; gap:14px; flex-wrap:wrap; font-size:.7em; color:var(--muted); margin-top:8px;}
+  .key i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px;}
+
+  table{width:100%; border-collapse:collapse; font-size:.76em;
+        font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+  th{text-align:left; color:var(--muted); font-weight:600; padding:4px 8px 6px; border-bottom:1px solid var(--line);}
+  td{padding:5px 8px; border-bottom:1px solid #1a2540;}
+  tr.hit td{background:#f871711a; color:var(--ink);}
+  tr.miss td{color:var(--muted); opacity:.55;}
+
+  .verdict{display:block; text-align:center; margin-top:12px; padding:10px 14px; border-radius:10px;
+           font-size:.84em; font-weight:700; line-height:1.5;}
+  .verdict.bad{background:#f8717122; color:var(--bad); border:1px solid #f8717155;}
+  .verdict.good{background:#34d39922; color:var(--good); border:1px solid #34d39955;}
+  .verdict.warn{background:#fbbf2422; color:var(--accent); border:1px solid #fbbf2455;}
+  .verdict small{display:block; font-weight:400; margin-top:5px; opacity:.9;}
+
+  .note{color:var(--muted); font-size:.8em; line-height:1.6;}
+  .note b{color:var(--ink); font-weight:600;}
+  footer{color:var(--muted); font-size:.74em; line-height:1.6; margin-top:18px;}
+  footer a{color:var(--muted);}
+  @media (max-width:880px){ main{grid-template-columns:minmax(0,1fr);} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Query Builder — <span>watch the SQL assemble as you type</span></h1>
+  <p class="sub">
+    A login form, and the query it builds underneath. Injection is not an incantation and the database
+    is not tricked: it does exactly what the sentence says. The only question is who got to write the
+    sentence.
+  </p>
+</header>
+
+<main>
+
+  <section class="card">
+    <h3>The login form</h3>
+    <label class="f" for="u">Username</label>
+    <input type="text" id="u" value="alice" autocomplete="off" spellcheck="false">
+    <label class="f" for="p">Password</label>
+    <input type="text" id="p" value="hunter2" autocomplete="off" spellcheck="false">
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <section class="card">
+    <h3>How the server builds it</h3>
+    <div class="opts" id="mode"></div>
+    <pre id="code"></pre>
+    <h3 style="margin-top:14px">The query the database receives</h3>
+    <pre id="sql"></pre>
+    <div class="key">
+      <span><i style="background:var(--data)"></i>your input, still data</span>
+      <span><i style="background:var(--code)"></i>your input, now <b>code</b></span>
+      <span><i style="background:var(--bound)"></i>bound value, never parsed</span>
+    </div>
+  </section>
+
+  <section class="card wide">
+    <h3>The users table, and what comes back</h3>
+    <table>
+      <thead><tr><th>id</th><th>username</th><th>password</th><th>role</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="verdict" id="verdict" role="status" aria-live="polite">—</div>
+  </section>
+
+  <section class="card wide">
+    <p class="note" style="margin:0" id="closing"></p>
+  </section>
+
+</main>
+
+<footer>
+  A deliberately small SQL engine runs in the page, so anything you type is really parsed and really
+  evaluated — including the mistakes. No network, no storage, no analytics.
+  Part of <a href="../">security-toys</a>.
+</footer>
+
+<script>
+"use strict";
+
+const USERS = [
+  {id:1, username:"alice", password:"hunter2",   role:"staff"},
+  {id:2, username:"bob",   password:"swordfish", role:"staff"},
+  {id:3, username:"admin", password:"Xq7!vTn2r", role:"administrator"}
+];
+
+const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+/* ---------- a small, real SQL-expression engine ----------
+   Not pattern matching: your input is tokenised, parsed and evaluated, so a payload
+   that shouldn't work doesn't, and a broken one raises a genuine syntax error. */
+function SqlError(m){ this.message = m; }
+
+function tokenize(s){
+  const t = []; let i = 0;
+  while(i < s.length){
+    const c = s[i];
+    if(/\s/.test(c)){ i++; continue; }
+    if((c === "-" && s[i+1] === "-") || c === "#"){ t.push({k:"cmt", at:i}); break; }
+    if(c === "'"){
+      let j = i+1, v = "";
+      while(j < s.length && s[j] !== "'"){ v += s[j++]; }
+      if(j >= s.length) throw new SqlError("unterminated string literal — the quote you opened is never closed");
+      t.push({k:"str", v}); i = j+1; continue;
+    }
+    if(/[0-9]/.test(c)){ let j = i; while(j < s.length && /[0-9.]/.test(s[j])) j++;
+      t.push({k:"num", v:+s.slice(i,j)}); i = j; continue; }
+    if(/[A-Za-z_]/.test(c)){ let j = i; while(j < s.length && /[A-Za-z0-9_]/.test(s[j])) j++;
+      const w = s.slice(i,j);
+      t.push(/^(or|and)$/i.test(w) ? {k:w.toLowerCase()} : {k:"id", v:w}); i = j; continue; }
+    if("=()".includes(c)){ t.push({k:c}); i++; continue; }
+    if(c === ";"){ t.push({k:";"}); i++; continue; }
+    throw new SqlError("unexpected character “"+c+"”");
+  }
+  return t;
+}
+
+function parse(tokens){
+  let i = 0;
+  const peek = () => tokens[i], eat = k => { if(tokens[i] && tokens[i].k === k){ i++; return true; } return false; };
+
+  function primary(){
+    const t = tokens[i];
+    if(!t || t.k === "cmt" || t.k === ";") throw new SqlError("the expression stops before it says anything");
+    if(eat("(")){ const e = orExpr(); if(!eat(")")) throw new SqlError("missing closing bracket"); return e; }
+    i++;
+    if(t.k === "str") return {t:"lit", v:t.v};
+    if(t.k === "num") return {t:"lit", v:t.v};
+    if(t.k === "id")  return {t:"col", v:t.v};
+    throw new SqlError("expected a value, found “"+(t.v ?? t.k)+"”");
+  }
+  function cmp(){ const l = primary(); if(eat("=")) return {t:"eq", l, r:primary()}; return {t:"truthy", l}; }
+  function andExpr(){ let l = cmp(); while(peek() && peek().k === "and") { i++; l = {t:"and", l, r:cmp()}; } return l; }
+  function orExpr(){ let l = andExpr(); while(peek() && peek().k === "or") { i++; l = {t:"or", l, r:andExpr()}; } return l; }
+
+  const ast = orExpr();
+  const rest = tokens[i];
+  if(rest && rest.k !== "cmt"){
+    if(rest.k === ";") return {ast, stacked:true};
+    throw new SqlError("unexpected “"+(rest.v ?? rest.k)+"” after the condition");
+  }
+  return {ast, stacked:false};
+}
+
+function evalNode(n, row){
+  switch(n.t){
+    case "lit": return n.v;
+    case "col":
+      if(!(n.v in row)) throw new SqlError("unknown column “"+n.v+"”");
+      return row[n.v];
+    case "eq":  return String(evalNode(n.l,row)) === String(evalNode(n.r,row));
+    case "and": return !!evalNode(n.l,row) && !!evalNode(n.r,row);
+    case "or":  return !!evalNode(n.l,row) || !!evalNode(n.r,row);
+    case "truthy": { const v = evalNode(n.l,row); return typeof v === "number" ? v !== 0 : !!v && v !== ""; }
+  }
+}
+
+/* ---------- rendering ---------- */
+const MODES = {
+  concat:{label:"String concatenation", note:"the query is built by gluing text together"},
+  param: {label:"Parameterised", note:"the query is fixed; values are sent separately"}
+};
+
+const PRESETS = [
+  {u:"alice", p:"hunter2",  t:"a real login"},
+  {u:"alice", p:"wrong",    t:"a wrong password"},
+  {u:"' OR 1=1--", p:"anything", t:"the tautology"},
+  {u:"admin'--",  p:"",     t:"log in as admin, no password"},
+  {u:"'",         p:"x",    t:"the probe"},
+  {u:"'; DROP TABLE users--", p:"", t:"Bobby Tables"}
+];
+
+const state = {mode:"concat"};
+const $ = id => document.getElementById(id);
+
+for(const [id,m] of Object.entries(MODES)){
+  const b = document.createElement("button");
+  b.className = "opt"; b.type = "button"; b.dataset.id = id;
+  b.innerHTML = m.label+"<small>"+m.note+"</small>";
+  b.addEventListener("click", () => { state.mode = id; render(); });
+  $("mode").appendChild(b);
+}
+PRESETS.forEach(p => {
+  const b = document.createElement("button");
+  b.className = "chip"; b.type = "button";
+  b.innerHTML = "<b>"+esc(p.u || "(empty)")+"</b>"+p.t;
+  b.addEventListener("click", () => { $("u").value = p.u; $("p").value = p.p; render(); });
+  $("chips").appendChild(b);
+});
+
+/* Split raw input at the first quote: before it the input is still data,
+   from the quote onwards it has become part of the sentence. */
+function paint(v){
+  const q = v.indexOf("'");
+  if(q === -1) return '<span class="data">'+esc(v)+'</span>';
+  return '<span class="data">'+esc(v.slice(0,q))+'</span>'+
+         '<span class="code">'+esc(v.slice(q))+'</span>';
+}
+
+function render(){
+  const u = $("u").value, p = $("p").value;
+  document.querySelectorAll("#mode .opt").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.id === state.mode)));
+
+  const param = state.mode === "param";
+
+  $("code").innerHTML = param
+    ? '<span class="lit">sql</span> = <span class="lit">"SELECT * FROM users WHERE username = ? AND password = ?"</span>\n'+
+      'stmt.<span class="kw">execute</span>(sql, [username, password])'
+    : '<span class="lit">sql</span> = <span class="lit">"SELECT * FROM users WHERE username = \'"</span> + username +\n'+
+      '      <span class="lit">"\' AND password = \'"</span> + password + <span class="lit">"\'"</span>\n'+
+      'db.<span class="kw">query</span>(sql)';
+
+  const K = s => '<span class="kw">'+s+'</span>';
+  let rows = [], verdict, cls, extra = "", sqlHtml;
+
+  if(param){
+    sqlHtml = K("SELECT")+" * "+K("FROM")+" users "+K("WHERE")+" username = "+
+              '<span class="bound">?</span>'+" "+K("AND")+" password = "+'<span class="bound">?</span>'+";\n"+
+              '<span class="lit">-- values sent separately, never parsed as SQL:</span>\n'+
+              '<span class="lit">   ?</span> = <span class="bound">'+esc(JSON.stringify(u))+'</span>\n'+
+              '<span class="lit">   ?</span> = <span class="bound">'+esc(JSON.stringify(p))+'</span>';
+    rows = USERS.filter(r => r.username === u && r.password === p);
+    if(rows.length){ cls = "good"; verdict = "Logged in as "+rows[0].username;
+      extra = "A genuine username and password. The safe version still lets real people in — that is the point people forget."; }
+    else { cls = "good"; verdict = "Login failed";
+      extra = "The whole string, quotes and all, was looked up as a username. There is no user called "+
+              JSON.stringify(u)+", so nothing comes back. The query was never re-read."; }
+  } else {
+    const whereRaw = "username = '"+u+"' AND password = '"+p+"'";
+    sqlHtml = K("SELECT")+" * "+K("FROM")+" users "+K("WHERE")+" username = "+
+              "<span class=\"lit\">'</span>"+paint(u)+"<span class=\"lit\">'</span> "+K("AND")+
+              " password = <span class=\"lit\">'</span>"+paint(p)+"<span class=\"lit\">'</span>;";
+    try{
+      const {ast, stacked} = parse(tokenize(whereRaw));
+      if(stacked){
+        cls = "warn"; verdict = "Two statements in one call";
+        extra = "Almost every database API refuses this: it sends one statement per call, so the second "+
+                "is not run. Bobby Tables is a joke about a real risk, but this exact payload usually "+
+                "fizzles. Do not conclude the form is safe — try the tautology instead.";
+      } else {
+        rows = USERS.filter(r => evalNode(ast, r));
+        if(rows.length === USERS.length){
+          cls = "bad"; verdict = "Logged in as "+rows[0].username+" — every row matched";
+          extra = "The condition is now true for everyone. Most login code takes the first row it gets.";
+        } else if(rows.length){
+          cls = "bad"; verdict = "Logged in as "+rows[0].username;
+          extra = rows[0].username === "admin" && p !== rows[0].password
+            ? "You are the administrator, and you never supplied a password. The comment marker threw away the half of the sentence that checks it."
+            : "The condition picked out a row.";
+        } else {
+          cls = "good"; verdict = "Login failed";
+          extra = "The sentence parsed, but nothing satisfies it.";
+        }
+      }
+    } catch(e){
+      cls = "warn"; verdict = "SQL syntax error";
+      extra = e.message + ". That error is itself a finding: the input reached the parser, so the "+
+              "form is injectable even though this particular payload broke. Attackers probe with a "+
+              "single quote for exactly this reply.";
+    }
+  }
+
+  $("rows").innerHTML = USERS.map(r => {
+    const hit = rows.includes(r);
+    return '<tr class="'+(hit?"hit":"miss")+'"><td>'+r.id+'</td><td>'+esc(r.username)+
+           '</td><td>'+esc(r.password)+'</td><td>'+esc(r.role)+'</td></tr>';
+  }).join("");
+
+  $("sql").innerHTML = sqlHtml;
+  $("verdict").className = "verdict "+cls;
+  $("verdict").innerHTML = esc(verdict)+"<small>"+extra+"</small>";
+
+  $("closing").innerHTML = param
+    ? "<b>Same input. Same form. One line of different code.</b> The parameterised query is fixed before "+
+      "your input is anywhere near it, so the quote has nothing to close and the words have nothing to "+
+      "join. This is not escaping or filtering the input — nobody inspected it, nobody blocked a "+
+      "keyword. The input simply never got to be part of the sentence. <b>Switch back and forth with "+
+      "the same payload; that toggle is the whole lesson.</b>"
+    : "<b>Nobody tricked the database.</b> It parsed the sentence it was handed and answered honestly. "+
+      "The vulnerability is one line above: a query assembled by gluing text together cannot tell which "+
+      "words came from the developer and which came from a stranger. <b>Watch where the colour changes "+
+      "— that quote is the exact character where your data stopped being data.</b>";
+}
+
+["u","p"].forEach(id => $(id).addEventListener("input", render));
+if(new URLSearchParams(location.search).has("present")) document.body.classList.add("present");
+render();
+</script>
+</body>
+</html>

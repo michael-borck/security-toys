@@ -18,7 +18,7 @@ from a USB stick, or uploaded to an LMS as a single file.
 | **[Defence in Depth](defence-in-depth/)** | "we bought a firewall, we're fine" — layer the controls, misalign the holes, buy the longest attack path your budget allows | ✅ ready |
 | **[Detection Dial](detection-dial/)** | base-rate neglect — no threshold gives you both a readable alert queue and full coverage | ✅ ready |
 | **[Rule Order](rule-order/)** | "a ruleset is a set" — it's a sequence, first match wins, and a leftover catch-all silences every rule beneath it | ✅ ready |
-| **Query Builder** | injection as magic incantation — watch the SQL assemble as you type, then flip one toggle | 🔨 building |
+| **[Query Builder](query-builder/)** | injection as magic incantation — watch the SQL assemble as you type, then flip one toggle | ✅ ready |
 | **EXIF Drop** | "a photo is a picture" — camera, timestamp, and the coordinates of wherever you were standing | 🔨 building |
 
 Add `?present` to any toy (e.g. `crack-time/?present`) to bump type sizes for a projector.
