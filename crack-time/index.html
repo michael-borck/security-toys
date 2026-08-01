@@ -87,6 +87,23 @@
 
   .note{color:var(--muted); font-size:.76em; line-height:1.55; margin-top:12px;}
   .note b{color:var(--ink); font-weight:600;}
+
+  details{border-top:1px solid var(--line); margin-top:14px; padding-top:12px;}
+  details summary{cursor:pointer; font-size:.85em; font-weight:700; color:var(--accent);
+                  list-style:none; display:flex; align-items:center; gap:8px;}
+  details summary::-webkit-details-marker{display:none;}
+  details summary::before{content:"+"; display:inline-block; width:1.1em; text-align:center;
+                          border:1px solid var(--line); border-radius:5px; font-weight:700;}
+  details[open] summary::before{content:"–";}
+  details .body{font-size:.8em; line-height:1.65; color:var(--muted); margin-top:12px;}
+  details .body p{margin-top:10px;}
+  details .body b{color:var(--ink); font-weight:600;}
+  .bits{display:flex; gap:10px; flex-wrap:wrap; margin:12px 0 2px;}
+  .bitbox{flex:1 1 180px; background:var(--panel2); border:1px solid var(--line);
+          border-radius:10px; padding:10px 12px;}
+  .bitbox span{display:block; font-size:.85em; color:var(--muted);}
+  .bitbox b{display:block; font-size:1.5em; margin-top:3px; color:var(--ink);}
+  .bitbox.q b{color:var(--system);}
   footer{max-width:1080px; margin:18px auto 0; color:var(--muted); font-size:.74em; line-height:1.6;}
   footer a{color:var(--muted);}
   .who{display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:6px; vertical-align:0px;}
@@ -151,6 +168,49 @@
       panel 2 and it moves by a factor of a billion. <b>Password strength is mostly not the user's
       decision</b> — which is why "use a strong password" is advice to the wrong person.
     </p>
+
+    <details>
+      <summary>What about quantum computing?</summary>
+      <div class="body">
+        <p>
+          <b>The common belief: a quantum computer tries every password at once and picks out the
+          right one.</b> It doesn't. Nothing does. What Grover's algorithm gives you is a
+          <b>quadratic speedup</b> on unstructured search — roughly the square root of the work.
+          In the unit that matters, it <b>halves the number of bits</b>:
+        </p>
+
+        <div class="bits">
+          <div class="bitbox"><span>This password's search space</span><b id="q-now">—</b></div>
+          <div class="bitbox q"><span>Under Grover's algorithm</span><b id="q-grover">—</b></div>
+        </div>
+        <p id="q-equiv"></p>
+
+        <p>
+          <b>Grover reduces the number of guesses, not the cost of each one.</b> A deliberately slow
+          hash multiplies every single guess, and that multiplication survives quantum untouched — so
+          bcrypt's work factor is as useful against a quantum attacker as against a GPU. The defence
+          you already had is the defence you'd still want.
+        </p>
+
+        <p>
+          <b>The thing quantum genuinely breaks is a different thing.</b> Shor's algorithm factors
+          large numbers efficiently, which kills RSA and elliptic-curve cryptography: <b>key exchange
+          and digital signatures</b>, not password hashes. That is what post-quantum standards such as
+          ML-KEM exist for, and why "harvest now, decrypt later" is a real worry for recorded traffic.
+          It is not a worry for the password file — there, the answer is simply more bits. There is no
+          such thing as a "quantum-resistant password hash"; there is only a longer password and a
+          higher work factor.
+        </p>
+
+        <p>
+          <b>And no machine capable of any of this exists.</b> The figures above are a theoretical
+          ceiling that ignores error correction — currently thousands of physical qubits per usable
+          logical one — and ignores that Grover parallelises badly, so an attacker cannot buy their
+          way forward with more machines. Meanwhile the cloud farm in panel 3 is rentable this
+          afternoon for about the price of lunch. <b>Worry about these in that order.</b>
+        </p>
+      </div>
+    </details>
   </section>
 
 </main>
@@ -339,9 +399,23 @@ function timeFor(store, cost, rig, a){
   return guesses / rate;
 }
 
+/* Grover's effect, expressed in bits rather than seconds. Inventing a quantum gate rate
+   would be fiction dressed as data; halving the exponent is the honest, checkable claim. */
+function renderQuantum(a){
+  if(!a.n){ $("q-now").textContent = $("q-grover").textContent = "—"; $("q-equiv").textContent = ""; return; }
+  const bits = Math.log2(a.n);
+  $("q-now").textContent = bits.toFixed(0) + " bits";
+  $("q-grover").textContent = (bits/2).toFixed(0) + " bits";
+  $("q-equiv").innerHTML =
+    "That is the same protection you would get today from a password with <b>half the strength</b> " +
+    "of this one. Not nothing — but a long way from “tries everything at once”. Double the length " +
+    "and you are back where you started.";
+}
+
 function render(){
   const a = analyse(state.pw);
   const isB = state.store === "bcrypt";
+  renderQuantum(a);
   $("costwrap").classList.toggle("on", isB);
   $("costval").textContent = state.cost;
 

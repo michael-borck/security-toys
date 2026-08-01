@@ -80,7 +80,42 @@ the stripped and unstripped forms are tested.
 standard dictionary-plus-rules attack, which the attacker does regardless of which word you chose. It
 is not the cost of your specific word. The UI says so, because students notice.
 
-## 5. Deliberate simplifications
+## 5. The quantum panel
+
+A collapsed `<details>` under the closing card, because "what about quantum computers?" is asked in
+every offering and the popular answer is wrong.
+
+**Three design decisions, all deliberate:**
+
+1. **Not a fourth attacker rig.** Adding a "quantum computer" button beside three real ones would
+   put a machine that does not exist on equal footing with hardware you can rent this afternoon.
+   That *is* the misconception; the toy must not reproduce it.
+2. **Not a storage option.** "Quantum-resistant hashing" is a category error. Quantum threatens
+   *asymmetric* cryptography via Shor's algorithm (RSA, elliptic curve: key exchange and
+   signatures), which is what post-quantum standards like ML-KEM address. Password hashing is
+   symmetric-flavoured work; the only answer there is more bits and a higher work factor.
+3. **Measured in bits, never in seconds.** Inventing a quantum gate rate would be fiction dressed as
+   data. Halving the exponent is the honest, checkable claim, so the panel shows
+   `log2(n)` against `log2(n)/2` and translates it as "a password with half the strength".
+
+Grover gives a **quadratic** speedup on unstructured search, roughly √N. Worked values:
+
+| Password | Search space | Under Grover |
+|---|---|---|
+| `P@ssw0rd!` (dictionary hit) | 23 bits | 12 bits |
+| `correct horse battery staple` | 57 bits | 29 bits |
+| 16-char random | 105 bits | 53 bits |
+
+The panel also carries the point that ties back to the toy's main lesson: **Grover reduces the
+number of guesses, not the cost of each one.** A slow hash multiplies every guess, and that
+multiplication survives quantum untouched, so bcrypt's work factor is as useful against a quantum
+attacker as against a GPU.
+
+It closes on proportion: no such machine exists, error correction currently costs thousands of
+physical qubits per logical one, Grover parallelises badly so more machines don't rescue it, and the
+cloud farm in panel 3 is rentable today. Worry in that order.
+
+## 6. Deliberate simplifications
 
 State these if a student pushes — each is a real limitation, not a bug:
 
@@ -95,7 +130,7 @@ State these if a student pushes — each is a real limitation, not a bug:
 - **This is not a password strength meter.** Do not present it as one, and do not let students test
   their real passwords in front of anyone.
 
-## 6. Non-negotiables
+## 7. Non-negotiables
 
 - Single self-contained `index.html`. No CDN, no fonts, no fetch, no storage, no analytics.
 - Nothing typed leaves the page; the UI says so next to the input.

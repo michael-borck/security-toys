@@ -25,6 +25,23 @@ Then hit the `P@ssw0rd!` chip and watch it classify as **Dictionary + rules**, n
 the substitutions are one automatic mangling rule. bcrypt buys about an hour against a serious rig
 and no more: a slow hash rescues a good password, not a bad one.
 
+## "What about quantum computing?"
+
+There's a collapsed panel at the bottom for the question that comes up every offering. It exists
+because the popular answer is wrong: a quantum computer does **not** try every password at once.
+Grover's algorithm is a *quadratic* speedup — roughly the square root of the work, which in practice
+**halves the number of bits**. The panel computes that live for whatever password is loaded.
+
+Three things it makes explicit, all worth saying out loud:
+
+- **Grover reduces the number of guesses, not the cost of each one.** A slow hash multiplies every
+  guess, and that multiplication survives quantum untouched — bcrypt's work factor is as useful
+  against a quantum attacker as against a GPU.
+- **What quantum actually breaks is something else.** Shor's algorithm kills RSA and elliptic curve:
+  key exchange and signatures, not password hashes. That's what post-quantum standards like ML-KEM
+  are for. There is no "quantum-resistant password hash" — only more bits.
+- **No such machine exists.** Meanwhile the cloud farm in panel 3 is rentable this afternoon.
+
 ## Using it in class
 
 1. Ask the room for a password they think is strong (nobody's real one). Type it. Leave it on MD5.
