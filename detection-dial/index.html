@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detection Dial — where do you set the threshold?</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2e; --panel2:#0e1626; --line:#22304d;
+    --ink:#e6edf7; --muted:#93a4c3;
+    --benign:#3b6ea5; --threat:#f87171; --alerted:#fbbf24;
+    --accent:#fbbf24; --good:#34d399; --warn:#fbbf24; --bad:#f87171;
+    --fs:16px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:radial-gradient(1200px 800px at 30% -10%, #16223c 0%, var(--bg) 55%);
+    color:var(--ink); font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:var(--fs); min-height:100vh; padding:20px clamp(14px,3vw,28px) 40px;
+  }
+  body.present{--fs:20px;}
+  header,main,footer{max-width:1080px; margin-left:auto; margin-right:auto;}
+  header{margin-bottom:16px;}
+  h1{font-size:1.45em; letter-spacing:.3px;}
+  h1 span{color:var(--accent);}
+  .sub{color:var(--muted); font-size:.85em; margin-top:6px; max-width:72ch; line-height:1.55;}
+  main{display:grid; gap:14px; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px;}
+  .card.wide{grid-column:1 / -1;}
+  h3{font-size:.72em; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted); margin-bottom:10px;}
+
+  /* ---- the stream ---- */
+  .plot{position:relative; height:190px; margin:6px 0 2px;
+        border-bottom:1px solid var(--line); border-left:1px solid var(--line);}
+  .bars{position:absolute; inset:0; display:flex; align-items:flex-end; gap:0;}
+  .bars i{flex:1 1 0; background:var(--benign); opacity:.75; min-height:0;}
+  .bars i.on{background:var(--alerted); opacity:.95;}
+  .shade{position:absolute; top:0; bottom:0; right:0; background:#fbbf2410;
+         border-left:2px solid var(--alerted); pointer-events:none;}
+  .pin{position:absolute; bottom:0; width:2px; background:var(--threat); pointer-events:none;
+       transform:translateX(-1px);}
+  .pin b{position:absolute; top:-7px; left:-4px; width:10px; height:10px; border-radius:50%;
+         background:var(--threat); box-shadow:0 0 0 3px #f8717133;}
+  .pin.missed{opacity:.32;}
+  .axis{display:flex; justify-content:space-between; color:var(--muted);
+        font-size:.68em; margin-top:6px;}
+  .ctl{margin-top:14px;}
+  .ctl label{display:flex; justify-content:space-between; font-size:.78em; color:var(--muted); margin-bottom:7px;}
+  .ctl label b{color:var(--alerted); font-size:1.15em;}
+  input[type=range]{width:100%; accent-color:#fbbf24;}
+  .presets{display:flex; gap:7px; flex-wrap:wrap; margin-top:11px;}
+  .preset{background:var(--panel2); border:1px solid var(--line); color:var(--muted);
+          border-radius:8px; padding:7px 11px; font-size:.75em; cursor:pointer; font-weight:600;}
+  .preset:hover{color:var(--ink); border-color:#3b82f6;}
+
+  /* ---- intrusions ---- */
+  .threat{display:flex; gap:10px; align-items:flex-start; padding:9px 0;
+          border-top:1px solid var(--line); font-size:.83em;}
+  .threat:first-of-type{border-top:0;}
+  .dot{flex:none; width:10px; height:10px; border-radius:50%; margin-top:5px; background:var(--threat);}
+  .threat.missed .dot{background:#2a3550;}
+  .threat .nm{font-weight:600;}
+  .threat.missed .nm{color:var(--muted);}
+  .threat .st{margin-left:auto; flex:none; font-size:.82em; font-weight:700; letter-spacing:.4px;
+              padding-top:3px;}
+  .threat .st.c{color:var(--good);} .threat .st.m{color:var(--threat);}
+  .threat small{display:block; color:var(--muted); font-weight:400; margin-top:2px; line-height:1.4;}
+
+  /* ---- cost ---- */
+  .facts{display:grid; gap:8px;}
+  .fact{display:flex; justify-content:space-between; gap:12px; font-size:.83em;
+        border-top:1px solid var(--line); padding-top:8px;}
+  .fact:first-child{border-top:0; padding-top:0;}
+  .fact span:first-child{color:var(--muted);}
+  .fact span:last-child{font-weight:700; text-align:right;}
+  .band{display:block; text-align:center; margin-top:13px; padding:9px 14px; border-radius:10px;
+        font-size:.82em; font-weight:700; letter-spacing:.3px;}
+  .band.bad{background:#f8717122; color:var(--bad); border:1px solid #f8717155;}
+  .band.warn{background:#fbbf2422; color:var(--warn); border:1px solid #fbbf2455;}
+
+  .opts{display:flex; gap:7px; flex-wrap:wrap;}
+  .opt{flex:1 1 auto; background:var(--panel2); border:1px solid var(--line); color:var(--muted);
+       border-radius:10px; padding:10px 12px; cursor:pointer; font-size:.8em; font-weight:600;
+       text-align:left; line-height:1.3;}
+  .opt small{display:block; font-weight:400; font-size:.82em; opacity:.75; margin-top:2px;}
+  .opt:hover{color:var(--ink);}
+  .opt[aria-pressed=true]{color:var(--ink); border-color:#3b82f6;
+    background:linear-gradient(180deg,#1a2a4a,#12203d); box-shadow:0 0 0 1px #3b82f655;}
+
+  .note{color:var(--muted); font-size:.8em; line-height:1.6;}
+  .note b{color:var(--ink); font-weight:600;}
+  .legend{display:flex; gap:16px; flex-wrap:wrap; font-size:.72em; color:var(--muted); margin-top:9px;}
+  .legend i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:-1px;}
+  footer{color:var(--muted); font-size:.74em; line-height:1.6; margin-top:18px;}
+  footer a{color:var(--muted);}
+  @media (max-width:860px){ main{grid-template-columns:minmax(0,1fr);} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Detection Dial — <span>where do you set the threshold?</span></h1>
+  <p class="sub">
+    Ten thousand events crossed the network today. Three of them were an attack. Your detector scores
+    every event for suspicion; you choose the score at which it becomes an alert someone has to read.
+    There is no setting that gives you both.
+  </p>
+</header>
+
+<main>
+
+  <section class="card">
+    <h3>Today's ten thousand events, by suspicion score</h3>
+    <div class="plot">
+      <div class="bars" id="bars"></div>
+      <div class="shade" id="shade"></div>
+      <div id="pins"></div>
+    </div>
+    <div class="axis"><span>0 · obviously routine</span><span>100 · obviously hostile</span></div>
+    <div class="legend">
+      <span><i style="background:var(--benign)"></i>ignored</span>
+      <span><i style="background:var(--alerted)"></i>alerted — a human reads every one</span>
+      <span><i style="background:var(--threat)"></i>the three real intrusions</span>
+    </div>
+
+    <div class="ctl">
+      <label for="t"><span>Alert threshold</span><span>score <b id="tval">60</b> and above</span></label>
+      <input type="range" id="t" min="1" max="99" value="60" step="1"
+             aria-describedby="verdict">
+      <div class="presets" id="presets"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>What you caught</h3>
+    <div id="threats"></div>
+  </section>
+
+  <section class="card">
+    <h3>What it costs</h3>
+    <div class="facts">
+      <div class="fact"><span>Alerts to read today</span><span id="alerts">—</span></div>
+      <div class="fact"><span>Real intrusions caught</span><span id="caught">—</span></div>
+      <div class="fact"><span>Of every alert, this many are real</span><span id="prec">—</span></div>
+      <div class="fact"><span>Analyst time at 4 min each</span><span id="time">—</span></div>
+      <div class="fact"><span>Analysts needed on shift</span><span id="shifts">—</span></div>
+    </div>
+    <div class="band" id="verdict" role="status" aria-live="polite">—</div>
+  </section>
+
+  <section class="card">
+    <h3>“Just buy a better detector”</h3>
+    <div class="opts" id="det"></div>
+    <p class="note" style="margin-top:12px" id="detnote"></p>
+  </section>
+
+  <section class="card wide">
+    <p class="note" style="margin:0">
+      <b>Drag the dial all the way along. There is nowhere good to stand.</b> Three in ten thousand is
+      a base rate of 0.03%, and a detector that is right nine times out of ten still drowns you in
+      wrong answers, because it is wrong about a much larger pile. The stealthy intrusion is not
+      beating your detector — <b>it is beating your budget</b>. That is why detection is never
+      finished at the tool: it is finished at triage, correlation, and deciding what you have chosen
+      not to look at.
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  Synthetic data, deterministic — the numbers are the same every time you open it, so the class can
+  argue about them. Runs entirely in your browser: no network, no storage, no analytics.
+  Part of <a href="../">security-toys</a>.
+</footer>
+
+<script>
+"use strict";
+
+const TOTAL = 10000, MIN_PER_ALERT = 4, SHIFT_MIN = 480;
+
+/* Three intrusions, deliberately unalike — that heterogeneity is the whole lesson.
+   Scores are fixed per detector rather than sampled, so the teaching case is stable. */
+const THREATS = [
+  {name:"Port scan from a compromised VPN account",
+   note:"Loud, clumsy, over in minutes. Any detector sees this one."},
+  {name:"Credential stuffing against the staff portal",
+   note:"Thousands of logins from a handful of addresses. Visible if you are looking."},
+  {name:"Low-and-slow data exfiltration over DNS",
+   note:"A few hundred bytes at a time, for six weeks. Looks almost exactly like normal traffic."}
+];
+
+const DETECTORS = {
+  basic:{label:"Basic",            note:"signature IDS, out of the box", mu:35, sd:20, scores:[78,55,30], seed:11},
+  good: {label:"Good",             note:"tuned SIEM with correlation",   mu:30, sd:18, scores:[88,64,37], seed:22},
+  best: {label:"State of the art", note:"ML behavioural analytics",      mu:24, sd:14, scores:[94,76,45], seed:33}
+};
+
+/* Deterministic PRNG so the numbers never move between demos. */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* Benign traffic: 9,997 events, normal-ish, clamped to 0..100, bucketed by integer score. */
+function buildHistogram(d){
+  const rnd = mulberry32(d.seed), h = new Array(101).fill(0);
+  for(let i = 0; i < TOTAL - THREATS.length; i++){
+    const u = Math.max(rnd(), 1e-9), v = rnd();
+    const z = Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+    const s = Math.round(Math.min(100, Math.max(0, d.mu + z*d.sd)));
+    h[s]++;
+  }
+  return h;
+}
+
+const HIST = {};
+for(const k in DETECTORS) HIST[k] = buildHistogram(DETECTORS[k]);
+
+const state = {t:60, det:"good"};
+const $ = id => document.getElementById(id);
+
+/* ---- static scaffolding ---- */
+const barEls = [];
+for(let s = 0; s <= 100; s++){
+  const b = document.createElement("i");
+  $("bars").appendChild(b); barEls.push(b);
+}
+const pinEls = THREATS.map(() => {
+  const p = document.createElement("div");
+  p.className = "pin"; p.innerHTML = "<b></b>";
+  $("pins").appendChild(p); return p;
+});
+const threatEls = THREATS.map(t => {
+  const el = document.createElement("div");
+  el.className = "threat";
+  el.innerHTML = '<span class="dot"></span><span><span class="nm">'+t.name+
+                 '</span><small>'+t.note+'</small></span><span class="st"></span>';
+  $("threats").appendChild(el); return el;
+});
+for(const [id,o] of Object.entries(DETECTORS)){
+  const b = document.createElement("button");
+  b.className = "opt"; b.type = "button"; b.dataset.id = id;
+  b.innerHTML = o.label+"<small>"+o.note+"</small>";
+  b.addEventListener("click", () => { state.det = id; render(); });
+  $("det").appendChild(b);
+}
+[["Catch everything", d => Math.min(...d.scores)],
+ ["A readable queue", () => null],
+ ["Quiet life",       d => Math.max(...d.scores)]
+].forEach(([label,fn]) => {
+  const b = document.createElement("button");
+  b.className = "preset"; b.type = "button"; b.textContent = label;
+  b.addEventListener("click", () => {
+    const d = DETECTORS[state.det];
+    state.t = fn(d) ?? readableThreshold();
+    $("t").value = state.t; render();
+  });
+  $("presets").appendChild(b);
+});
+
+/* Lowest threshold whose alert queue one analyst could actually clear in a shift. */
+function readableThreshold(){
+  for(let t = 1; t <= 99; t++) if(alertsAt(t) * MIN_PER_ALERT <= SHIFT_MIN) return t;
+  return 99;
+}
+function benignAt(t){
+  const h = HIST[state.det]; let n = 0;
+  for(let s = t; s <= 100; s++) n += h[s];
+  return n;
+}
+function caughtAt(t){ return DETECTORS[state.det].scores.filter(s => s >= t).length; }
+function alertsAt(t){ return benignAt(t) + caughtAt(t); }
+
+function fmt(n){ return Math.round(n).toLocaleString(); }
+
+function render(){
+  const d = DETECTORS[state.det], h = HIST[state.det], t = state.t;
+  $("tval").textContent = t;
+
+  document.querySelectorAll("#det .opt").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.id === state.det)));
+
+  // bars: sqrt scale so the thin tail the intrusions live in stays visible
+  const max = Math.sqrt(Math.max(...h));
+  barEls.forEach((el,s) => {
+    el.style.height = (Math.sqrt(h[s]) / max * 100) + "%";
+    el.className = s >= t ? "on" : "";
+  });
+  $("shade").style.left = t + "%";
+
+  const caught = caughtAt(t), alerts = alertsAt(t), mins = alerts * MIN_PER_ALERT;
+
+  d.scores.forEach((sc,i) => {
+    const hit = sc >= t;
+    pinEls[i].style.left = sc + "%";
+    pinEls[i].style.height = "100%";
+    pinEls[i].className = "pin" + (hit ? "" : " missed");
+    threatEls[i].className = "threat" + (hit ? "" : " missed");
+    const st = threatEls[i].querySelector(".st");
+    st.textContent = hit ? "CAUGHT" : "MISSED";
+    st.className = "st " + (hit ? "c" : "m");
+  });
+
+  $("alerts").textContent = fmt(alerts);
+  $("caught").textContent = caught + " of 3";
+  $("prec").textContent = caught === 0 ? "none — every alert is a false alarm"
+                                       : "1 in " + fmt(alerts / caught);
+  $("time").textContent = mins < 60 ? fmt(mins) + " min" : (mins/60).toFixed(1) + " hours";
+  const shifts = mins / SHIFT_MIN;
+  $("shifts").textContent = shifts < 1 ? "under one" : shifts.toFixed(1);
+
+  const v = $("verdict");
+  if(caught === 3 && shifts > 1){
+    v.className = "band bad";
+    v.textContent = "Total coverage — and " + Math.ceil(shifts) +
+                    " analysts reading alerts all day to get it.";
+  } else if(caught === 3){
+    v.className = "band warn";
+    v.textContent = "Everything caught, queue survivable. Enjoy it — try the other detectors.";
+  } else if(shifts <= 1){
+    v.className = "band bad";
+    v.textContent = "A queue one analyst can clear — and " + (3-caught) +
+                    " of 3 intrusions walked straight past.";
+  } else {
+    v.className = "band bad";
+    v.textContent = (3-caught) + " missed, and still " + Math.ceil(shifts) +
+                    " analysts' worth of reading. The worst of both.";
+  }
+
+  const need = Math.min(...d.scores);
+  const cost = alertsAt(need), costShifts = cost * MIN_PER_ALERT / SHIFT_MIN;
+  $("detnote").innerHTML =
+    "Even with <b>" + d.label.toLowerCase() + "</b>, the quietest intrusion only scores <b>" + need +
+    "</b>. To catch it you must alert on everything from " + need + " up — <b>" + fmt(cost) +
+    " alerts a day</b>, about <b>" + Math.ceil(costShifts) + " analysts</b> doing nothing else. " +
+    "A better detector moves that number. It never removes it.";
+}
+
+$("t").addEventListener("input", e => { state.t = +e.target.value; render(); });
+if(new URLSearchParams(location.search).has("present")) document.body.classList.add("present");
+render();
+</script>
+</body>
+</html>

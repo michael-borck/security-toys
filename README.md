@@ -16,7 +16,7 @@ from a USB stick, or uploaded to an LMS as a single file.
 |---|---|---|
 | **[Crack Time](crack-time/)** | "complexity is what matters" — time-to-crack is length × algorithm × work factor, and two of those belong to the site | ✅ ready |
 | **[Defence in Depth](defence-in-depth/)** | "we bought a firewall, we're fine" — layer the controls, misalign the holes, buy the longest attack path your budget allows | ✅ ready |
-| **Detection Dial** | base-rate neglect — no threshold gives you both a readable alert queue and full coverage | 🔨 building |
+| **[Detection Dial](detection-dial/)** | base-rate neglect — no threshold gives you both a readable alert queue and full coverage | ✅ ready |
 | **Rule Order** | "a ruleset is a set" — it's a sequence, first match wins, and the catch-all undoes everything above it | 🔨 building |
 | **Query Builder** | injection as magic incantation — watch the SQL assemble as you type, then flip one toggle | 🔨 building |
 | **EXIF Drop** | "a photo is a picture" — camera, timestamp, and the coordinates of wherever you were standing | 🔨 building |
